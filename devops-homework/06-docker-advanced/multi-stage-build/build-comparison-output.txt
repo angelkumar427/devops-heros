@@ -1,0 +1,54 @@
+=== Multi-stage vs single-stage Docker build - size comparison ===
+Docker 29.5.2 on aarch64
+Date: Thu Sep  3 23:39:37 IST 2026
+
+--- 1. Build the NAIVE single-stage image (ships the whole Go toolchain) ---
+$ docker build -f Dockerfile.single-stage -t gohello-singlestage .
+Step 6/6 : ENTRYPOINT ["/out/server"]
+ ---> Running in c341e751e16e
+ ---> Removed intermediate container c341e751e16e
+ ---> 1281f8c3d9de
+Successfully built 1281f8c3d9de
+Successfully tagged gohello-singlestage:latest
+
+--- 2. Build the MULTI-STAGE image (scratch + static binary only) ---
+$ docker build -f Dockerfile -t gohello-multistage .
+Step 8/8 : ENTRYPOINT ["/server"]
+ ---> Running in 6603ac316328
+ ---> Removed intermediate container 6603ac316328
+ ---> cc227adf43ea
+Successfully built cc227adf43ea
+Successfully tagged gohello-multistage:latest
+
+--- 3. Compare the two image sizes ---
+$ docker images | grep gohello
+REPOSITORY            TAG             SIZE
+gohello-multistage    latest          10.5MB
+gohello-singlestage   latest          440MB
+
+single-stage : 440MB on disk (full Go toolchain shipped in the final image)
+multi-stage  : 10.5MB on disk (scratch base + one static binary)
+reduction    : 42x smaller (440MB -> 10.5MB)
+
+--- 4. Run a container from the multi-stage image on port 8080 ---
+$ docker run -d --name gohello -p 8080:8080 gohello-multistage
+2afb1e73a1f8ea72edd077ab16a3ea77fc18a5c90c48075a4988145e7b6619cf
+
+--- 5. Verify the container is running on port 8080 (docker ps) ---
+$ docker ps
+NAMES     IMAGE                STATUS                  PORTS
+gohello   gohello-multistage   Up Less than a second   0.0.0.0:8080->8080/tcp, [::]:8080->8080/tcp
+
+--- 6. Access the application and confirm the required output ---
+$ curl http://localhost:8080
+<!doctype html>
+<html>
+<head><title>Multi-stage build</title></head>
+<body>
+<h1>Hello World from Docker multi-stage build</h1>
+<p>Served from a multi-stage-built Docker image on port 8080.</p>
+</body>
+</html>
+
+$ curl -s http://localhost:8080 | grep -o "Hello World from Docker multi-stage build"
+Hello World from Docker multi-stage build

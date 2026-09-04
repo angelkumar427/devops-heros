@@ -5,5 +5,7 @@
 
 ## Submission link
 - Section A: https://forms.gle/ydjAJcwxjpjBXgxB8
-- Section B: https://forms.gle/pAuXQaokwVzhRzit6                      
+- Section B: https://forms.gle/pAuXQaokwVzhRzit6
 
+## My homework submission
+- [`devops-homework/`](./devops-homework/) — all six tasks (Linux fundamentals, shell scripting, networking, Git/GitHub, Docker fundamentals, advanced Docker), each in its own folder with working code and real captured command output.

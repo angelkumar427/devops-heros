@@ -1,0 +1,90 @@
+=== Docker Networking Task 1: 3 containers, 3 networks, backend on 2 networks ===
+Docker 29.5.2 on aarch64
+Date: Thu Sep  3 23:44:05 IST 2026
+
+################ 1. Create 3 different Docker networks ################
+$ docker network create frontend-net
+81a11c1ab0f6e1f2df571cdf86258522cf894cbb7f02c787259e198c7fbdf93b
+$ docker network create backend-net
+1ce2de0560869a3fe909df372d55fb1bb2167a4b4cd80554e2f010d5b675b5bd
+$ docker network create db-net
+247a3cf6802f9f858bc280d646975a6e96dc6f3d06fdeaaa48f50b6e28c144db
+
+$ docker network ls
+NAME           DRIVER    SCOPE
+backend-net    bridge    local
+bridge         bridge    local
+db-net         bridge    local
+frontend-net   bridge    local
+host           host      local
+none           null      local
+
+################ 2. Create the 3 containers ################
+# Frontend = Nginx, attached to frontend-net
+$ docker run -d --name frontend --network frontend-net -p 8085:80 nginx:alpine
+f55e31d2c7b4aac857eaf6209045689537431cbeccfff3cafbd38b9c9199f2e4
+
+# Database = MySQL, attached to db-net only
+$ docker run -d --name database --network db-net -e MYSQL_ROOT_PASSWORD=rootpw -e MYSQL_DATABASE=appdb mysql:8.4
+62f2b98b76d59d1ef787bf9039907e5ec2e9070831999ecc3575d51fb1d159a9
+
+# Backend = Alpine, attached to frontend-net FIRST ...
+$ docker run -d --name backend --network frontend-net alpine sh -c "apk add --no-cache busybox-extras >/dev/null && mkdir -p /www && echo backend-tier-OK > /www/index.html && httpd -f -p 5000 -h /www"
+fd7ce26af927bab53e4425e8e5594b3ec45a91fa6a55b9a25dbf457a51f5b7dd
+
+################ 3. Add the backend container to a SECOND network ################
+$ docker network connect db-net backend
+
+# backend is now on 2 networks (frontend-net + db-net):
+$ docker inspect backend --format "{{range \$k,\$v := .NetworkSettings.Networks}}{{\$k}} {{end}}"
+db-net frontend-net 
+
+# membership of each network:
+frontend-net   -> frontend backend 
+backend-net    -> 
+db-net         -> database backend 
+
+$ docker ps
+NAMES      IMAGE                STATUS                  PORTS
+backend    alpine               Up Less than a second   
+database   mysql:8.4            Up Less than a second   3306/tcp, 33060/tcp
+frontend   nginx:alpine         Up Less than a second   0.0.0.0:8085->80/tcp, [::]:8085->80/tcp
+gohello    gohello-multistage   Up 3 minutes            0.0.0.0:8080->8080/tcp, [::]:8080->8080/tcp
+
+################ 4. Wait for MySQL to finish initialising ################
+MySQL ready after ~6s
+mysqld is alive
+
+################ 5. Check connectivity between the containers ################
+
+--- 5a. frontend -> backend (SAME network: frontend-net) => expect SUCCESS ---
+$ docker exec frontend wget -qO- http://backend:5000/
+backend-tier-OK
+exit=0
+
+--- 5b. backend -> database (SAME network: db-net) => expect SUCCESS ---
+$ docker exec backend getent hosts database     # DNS resolution over db-net
+172.20.0.2        database  database
+$ docker exec backend nc -z -w 3 database 3306 && echo "TCP 3306 reachable"
+TCP 3306 reachable
+
+--- 5c. frontend -> database (NO shared network) => expect FAILURE (isolation) ---
+$ docker exec frontend getent hosts database
+exit=2
+$ docker exec frontend nc -z -w 3 database 3306
+nc: bad address 'database'
+exit=1 (non-zero = unreachable, which is the point)
+
+--- 5d. a container on the 3rd network (backend-net) reaches NOTHING => isolation ---
+$ docker run -d --name isolated --network backend-net alpine sleep 300
+b6af85b6a15cc75d2443ec8c67f2385c352070938eddbcc6f8b7c7a6dafde544
+$ docker exec isolated getent hosts frontend
+  -> exit=2 (2 = name does not resolve; no shared network)
+$ docker exec isolated getent hosts backend
+  -> exit=2 (2 = name does not resolve; no shared network)
+$ docker exec isolated getent hosts database
+  -> exit=2 (2 = name does not resolve; no shared network)
+
+--- 5e. proof the frontend itself serves from the host ---
+$ curl -s -o /dev/null -w "%{http_code}\n" http://localhost:8085/
+200

@@ -1,0 +1,6 @@
+USER         PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND
+root           1  0.0  0.0   2300  1248 ?        Ss   18:41   0:00 sleep 600
+root          46  0.0  0.0      0     0 ?        Z    18:41   0:00 [dpkg-preconfigu] <defunct>
+root         135  0.0  0.0   2404  1468 ?        Ss   18:41   0:00 sh -c ./system-report.sh < /tmp/answers.txt > /tmp/run-output.txt 2>&1
+root         141  0.0  0.0   3900  3000 ?        S    18:41   0:00 bash ./system-report.sh
+root         153  0.0  0.0   6004  3260 ?        R    18:41   0:00 ps aux

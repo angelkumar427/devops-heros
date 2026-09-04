@@ -1,0 +1,94 @@
+=== Task 5: Docker Fundamentals - build, run and verify all six Hello World apps ===
+Docker 29.5.2 on aarch64
+Date: Thu Sep  3 23:30:55 IST 2026
+
+--- images built ---
+$ docker images | grep hello-
+REPOSITORY        TAG             SIZE
+hello-nginx       latest          102MB
+hello-react       latest          102MB
+hello-apache      latest          105MB
+hello-java        latest          286MB
+hello-python      latest          87.8MB
+hello-nodejs      latest          194MB
+
+--- starting containers ---
+$ docker run -d --name hello-nodejs -p 3000:3000 hello-nodejs
+f4162d1168a4b80e001cb14813ab42b164b03d9fa17243e3536048919c9e4b2f
+$ docker run -d --name hello-python -p 5001:5000 hello-python
+9aaefb430c572163768781cc0f847bebd31121dab9a3e1ea74b0691ef339ff9f
+$ docker run -d --name hello-java -p 8080:8080 hello-java
+784c8563561369d225db6166b9bc8aabee56082cbe785d359489b5d690e48155
+$ docker run -d --name hello-apache -p 8081:80 hello-apache
+e27dfcc9e71ddadd7d13a8ee43b92db9438b5b93d3335d3ff550fbbd3068f90a
+$ docker run -d --name hello-nginx -p 8082:80 hello-nginx
+07738a405f9695712d1f9630090659d851c3685a2dc595ab2b1d8e8f53fc0ac4
+$ docker run -d --name hello-react -p 8083:80 hello-react
+8684c5caa9c343dae80dcb0dbdf7d27f1b1b687a8656519fbc929ee3edf8b2a3
+
+--- docker ps ---
+$ docker ps
+NAMES          IMAGE          STATUS                  PORTS
+hello-react    hello-react    Up Less than a second   0.0.0.0:8083->80/tcp, [::]:8083->80/tcp
+hello-nginx    hello-nginx    Up Less than a second   0.0.0.0:8082->80/tcp, [::]:8082->80/tcp
+hello-apache   hello-apache   Up Less than a second   0.0.0.0:8081->80/tcp, [::]:8081->80/tcp
+hello-java     hello-java     Up Less than a second   0.0.0.0:8080->8080/tcp, [::]:8080->8080/tcp
+hello-python   hello-python   Up Less than a second   0.0.0.0:5001->5000/tcp, [::]:5001->5000/tcp
+hello-nodejs   hello-nodejs   Up Less than a second   0.0.0.0:3000->3000/tcp, [::]:3000->3000/tcp
+
+--- verifying each webpage with curl ---
+
+### Node.js - curl http://localhost:3000
+<h1>Hello World from Node.js!</h1><p>Served by a Docker container.</p>
+
+### Python - curl http://localhost:5001
+<h1>Hello World from Python!</h1><p>Served by a Docker container.</p>
+
+### Java - curl http://localhost:8080
+<h1>Hello World from Java!</h1><p>Served by a Docker container.</p>
+
+### Apache - curl http://localhost:8081
+<!DOCTYPE html>
+<html>
+  <head><title>Hello World - Apache</title></head>
+  <body>
+    <h1>Hello World from Apache!</h1>
+    <p>Served by a Docker container.</p>
+  </body>
+</html>
+
+### Nginx - curl http://localhost:8082
+<!DOCTYPE html>
+<html>
+  <head><title>Hello World - Nginx</title></head>
+  <body>
+    <h1>Hello World from Nginx!</h1>
+    <p>Served by a Docker container.</p>
+  </body>
+</html>
+
+### React - curl http://localhost:8083
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Hello World - React</title>
+  </head>
+  <body>
+    <div id="root">Hello World from React! (fallback text, replaced once React mounts)</div>
+
+    <!-- React & ReactDOM are vendored locally (production UMD builds) so the
+         container has zero runtime dependency on an external CDN. -->
+    <script src="/react.production.min.js"></script>
+    <script src="/react-dom.production.min.js"></script>
+    <script>
+      const e = React.createElement;
+      const App = () =>
+        e('div', null,
+          e('h1', null, 'Hello World from React!'),
+          e('p', null, 'Served by a Docker container (static build, Nginx, no CDN dependency).')
+        );
+      ReactDOM.createRoot(document.getElementById('root')).render(e(App));
+    </script>
+  </body>
+</html>

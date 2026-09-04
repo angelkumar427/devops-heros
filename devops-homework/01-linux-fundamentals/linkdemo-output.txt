@@ -1,0 +1,29 @@
+$ echo "This is the original file content." > original.txt
+
+$ ln original.txt hardlink.txt          # create hard link
+$ ln -s original.txt softlink.txt        # create soft (symbolic) link
+
+$ ls -li
+total 8
+1171855 -rw-r--r-- 2 root root 35 Sep  3 15:04 hardlink.txt
+1171855 -rw-r--r-- 2 root root 35 Sep  3 15:04 original.txt
+1171857 lrwxrwxrwx 1 root root 12 Sep  3 15:04 softlink.txt -> original.txt
+
+$ cat hardlink.txt
+This is the original file content.
+$ cat softlink.txt
+This is the original file content.
+
+$ rm original.txt   # delete the original file
+
+$ cat hardlink.txt   # still works - hard link shares the same inode/data
+This is the original file content.
+$ cat softlink.txt   # broken - symlink only stored the path, which is now gone
+cat: softlink.txt: No such file or directory
+
+$ ls -li             # softlink.txt now shown in red/broken by most shells
+total 4
+1171855 -rw-r--r-- 1 root root 35 Sep  3 15:04 hardlink.txt
+1171857 lrwxrwxrwx 1 root root 12 Sep  3 15:04 softlink.txt -> original.txt
+
+$ rm hardlink.txt softlink.txt   # cleanup

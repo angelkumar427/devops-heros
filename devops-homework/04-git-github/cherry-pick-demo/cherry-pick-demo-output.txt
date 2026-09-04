@@ -1,0 +1,95 @@
+=== Git cherry-pick demo ===
+Date: Fri Sep  4 14:01:43 UTC 2026
+
+################ 1. Create 3 commits on the main branch ################
+$ echo "# Demo app" > README.md && git add README.md && git commit -m "Initial commit on main"
+5b91527 Initial commit on main
+
+$ echo "console.log(\"app start\");" > app.js && git add app.js && git commit -m "Add app entry point"
+ea584c7 Add app entry point
+
+$ echo "PORT=3000" > .env.example && git add .env.example && git commit -m "Add example config"
+3b03c51 Add example config
+
+################ 2. View the commits with git log ################
+$ git log --oneline
+3b03c51 Add example config
+ea584c7 Add app entry point
+5b91527 Initial commit on main
+
+################ 3. Create a new branch and make 3 commits on it ################
+$ git checkout -b feature/login
+feature/login
+
+$ ... commit 1: the login feature
+00d5d73 Add login feature
+$ ... commit 2: input validation  <-- this is the one we will cherry-pick
+215b34f Add login validation
+$ ... commit 3: tests
+74144c5 Add login tests
+
+################ 4. Use git log to identify the specific commit ################
+$ git log --oneline
+74144c5 Add login tests
+215b34f Add login validation
+00d5d73 Add login feature
+3b03c51 Add example config
+ea584c7 Add app entry point
+5b91527 Initial commit on main
+
+$ TARGET=$(git log --format="%h %s" | grep "Add login validation" | cut -d" " -f1)
+TARGET=215b34f
+$ git show --stat $TARGET
+215b34f Add login validation
+ validate.js | 1 +
+ 1 file changed, 1 insertion(+)
+
+################ 5. Cherry-pick that ONE commit into main ################
+$ git checkout main
+main
+$ ls    # validate.js is not here yet
+README.md
+app.js
+
+$ git cherry-pick 215b34f
+[main 508ee57] Add login validation
+ Date: Fri Sep 4 19:31:44 2026 +0530
+ 1 file changed, 1 insertion(+)
+ create mode 100644 validate.js
+
+################ 6. Verify the change is now on main ################
+$ ls    # validate.js has arrived, WITHOUT login.js or login.test.js
+README.md
+app.js
+validate.js
+
+$ cat validate.js
+function validate(u){ return typeof u === "string" && u.length > 2; }
+
+$ git log --oneline
+508ee57 Add login validation
+3b03c51 Add example config
+ea584c7 Add app entry point
+5b91527 Initial commit on main
+
+$ git log --all --graph --oneline --decorate
+* 74144c5 (feature/login) Add login tests
+* 215b34f Add login validation
+* 00d5d73 Add login feature
+| * 508ee57 (HEAD -> main) Add login validation
+|/  
+* 3b03c51 Add example config
+* ea584c7 Add app entry point
+* 5b91527 Initial commit on main
+
+# ^ main now has "Add login validation" as a NEW commit with a DIFFERENT hash
+#   than the original on feature/login - cherry-pick copies the change as a
+#   fresh commit rather than moving or merging the original.
+
+$ git log --format="%h %s" -1 main; git log --format="%h %s" feature/login | grep validation
+on main:            508ee57 Add login validation
+on feature/login:   215b34f Add login validation
+
+# Same subject and same content, two different SHAs. And note main did NOT
+# receive "Add login feature" or "Add login tests" - that selectivity is the
+# entire point of cherry-pick versus a merge.

@@ -1,0 +1,89 @@
+=== journalctl - hands-on ===
+Run on: Ubuntu 24.04.4 LTS, Linux 6.8.0-117-generic aarch64
+Date: Fri Sep  4 14:00:13 UTC 2026
+
+$ journalctl --version | head -1
+systemd 255 (255.4-1ubuntu8.15)
+
+$ systemctl is-system-running     # confirm this is really a systemd host
+degraded
+
+################ 1. Recent SYSTEM log entries ################
+# --until also demonstrates time filtering, and keeps this excerpt to
+# steady-state system activity rather than the session that ran this script.
+$ journalctl --until "10 min ago" -n 8 --no-pager
+Sep 04 19:17:15 colima lima-guestagent[1124]: time="2026-09-04T19:17:15+05:30" level=info msg="SyncTime: system time synchronized with host (drift was 101.409776ms)"
+Sep 04 19:17:45 colima lima-guestagent[1124]: time="2026-09-04T19:17:45+05:30" level=info msg="SyncTime: system time synchronized with host (drift was 100.191732ms)"
+Sep 04 19:17:45 colima systemd[1]: Starting apt-daily.service - Daily apt download activities...
+Sep 04 19:17:45 colima systemd[1]: apt-daily.service: Deactivated successfully.
+Sep 04 19:17:45 colima systemd[1]: Finished apt-daily.service - Daily apt download activities.
+Sep 04 19:18:25 colima lima-guestagent[1124]: time="2026-09-04T19:18:25+05:30" level=info msg="SyncTime: system time synchronized with host (drift was 105.504643ms)"
+Sep 04 19:19:25 colima lima-guestagent[1124]: time="2026-09-04T19:19:25+05:30" level=info msg="SyncTime: system time synchronized with host (drift was 101.875043ms)"
+Sep 04 19:19:55 colima lima-guestagent[1124]: time="2026-09-04T19:19:55+05:30" level=info msg="SyncTime: system time synchronized with host (drift was 100.972877ms)"
+
+################ 2. Logs for a SPECIFIC service ################
+$ systemctl status docker --no-pager | head -6
+● docker.service - Docker Application Container Engine
+     Loaded: loaded (/usr/lib/systemd/system/docker.service; enabled; preset: enabled)
+    Drop-In: /etc/systemd/system/docker.service.d
+             └─docker.conf
+     Active: active (running) since Thu 2026-09-03 23:26:57 IST; 20h ago
+TriggeredBy: ● docker.socket
+
+$ journalctl -u docker.service -n 12 --no-pager
+Sep 04 00:11:10 colima dockerd[1544]: time="2026-09-04T00:11:10.749935671+05:30" level=info msg="received task-delete event from containerd" container=162f64ad194f86a6da3d8dd9f88cf16c4fbb75db586da4d1304ac67d38110181 module=libcontainerd namespace=moby topic=/tasks/delete type="*events.TaskDelete"
+Sep 04 00:15:11 colima dockerd[1544]: time="2026-09-04T00:15:11.451232572+05:30" level=info msg="received task-delete event from containerd" container=2afb1e73a1f8ea72edd077ab16a3ea77fc18a5c90c48075a4988145e7b6619cf module=libcontainerd namespace=moby topic=/tasks/delete type="*events.TaskDelete"
+Sep 04 00:15:11 colima dockerd[1544]: time="2026-09-04T00:15:11.452533895+05:30" level=info msg="received task-delete event from containerd" container=add17bd197752e320fddb24231bfab1705a9b342ea4b964620017f613ed74e04 module=libcontainerd namespace=moby topic=/tasks/delete type="*events.TaskDelete"
+Sep 04 00:15:11 colima dockerd[1544]: time="2026-09-04T00:15:11.454239881+05:30" level=info msg="received task-delete event from containerd" container=fd7ce26af927bab53e4425e8e5594b3ec45a91fa6a55b9a25dbf457a51f5b7dd module=libcontainerd namespace=moby topic=/tasks/delete type="*events.TaskDelete"
+Sep 04 00:15:11 colima dockerd[1544]: time="2026-09-04T00:15:11.467201276+05:30" level=info msg="received task-delete event from containerd" container=f55e31d2c7b4aac857eaf6209045689537431cbeccfff3cafbd38b9c9199f2e4 module=libcontainerd namespace=moby topic=/tasks/delete type="*events.TaskDelete"
+Sep 04 00:15:11 colima dockerd[1544]: time="2026-09-04T00:15:11.472856355+05:30" level=info msg="received task-delete event from containerd" container=faaa9add2e7e2ba9de9c4e3a675df7f30469094028880482e3d253cb410af1d0 module=libcontainerd namespace=moby topic=/tasks/delete type="*events.TaskDelete"
+Sep 04 19:24:50 colima dockerd[1544]: time="2026-09-04T19:24:50.281818050+05:30" level=info msg="sbJoin: gwep4 ''->'17c4072f237f', gwep6 ''->''" eid=17c4072f237f ep=netdemo net=bridge nid=f48445827b2c
+Sep 04 19:27:17 colima dockerd[1544]: time="2026-09-04T19:27:17.675413010+05:30" level=info msg="received task-delete event from containerd" container=84cbee7461468615bfc755b0d19f5d9a75b0fd684ed329d9e80aa50013239740 module=libcontainerd namespace=moby topic=/tasks/delete type="*events.TaskDelete"
+Sep 04 19:28:26 colima dockerd[1544]: time="2026-09-04T19:28:26.200713939+05:30" level=info msg="sbJoin: gwep4 ''->'0bfc5b2b8a42', gwep6 ''->''" eid=0bfc5b2b8a42 ep=userdemo net=bridge nid=f48445827b2c
+Sep 04 19:28:28 colima dockerd[1544]: time="2026-09-04T19:28:28.820619525+05:30" level=info msg="received task-delete event from containerd" container=5174d66c3a05042e6934331320f99542f709238ee771df3b4fb91a715808e410 module=libcontainerd namespace=moby topic=/tasks/delete type="*events.TaskDelete"
+Sep 04 19:28:53 colima dockerd[1544]: time="2026-09-04T19:28:53.428515365+05:30" level=info msg="sbJoin: gwep4 ''->'3e4d69cebdf8', gwep6 ''->''" eid=3e4d69cebdf8 ep=userdemo net=bridge nid=f48445827b2c
+Sep 04 19:28:58 colima dockerd[1544]: time="2026-09-04T19:28:58.101284518+05:30" level=info msg="received task-delete event from containerd" container=0c0a6a9f291401e0c7a6ecf8d2b902efb32b466ce1be2772d93225ae7408ba90 module=libcontainerd namespace=moby topic=/tasks/delete type="*events.TaskDelete"
+
+$ journalctl -u systemd-networkd.service -n 8 --no-pager
+Sep 04 19:28:29 colima systemd-networkd[416]: docker0: Lost carrier
+Sep 04 19:28:53 colima systemd-networkd[416]: vethf67fbb9: Link UP
+Sep 04 19:28:53 colima systemd-networkd[416]: vethf67fbb9: Gained carrier
+Sep 04 19:28:53 colima systemd-networkd[416]: docker0: Gained carrier
+Sep 04 19:28:55 colima systemd-networkd[416]: vethf67fbb9: Gained IPv6LL
+Sep 04 19:28:58 colima systemd-networkd[416]: vethf67fbb9: Lost carrier
+Sep 04 19:28:58 colima systemd-networkd[416]: vethf67fbb9: Link DOWN
+Sep 04 19:28:59 colima systemd-networkd[416]: docker0: Lost carrier
+
+################ 3. Follow a service live (-f), 3 seconds then stop ################
+$ timeout 3 journalctl -u docker.service -f --no-pager; echo "(stopped)"
+Sep 04 19:28:26 colima dockerd[1544]: time="2026-09-04T19:28:26.200713939+05:30" level=info msg="sbJoin: gwep4 ''->'0bfc5b2b8a42', gwep6 ''->''" eid=0bfc5b2b8a42 ep=userdemo net=bridge nid=f48445827b2c
+Sep 04 19:28:28 colima dockerd[1544]: time="2026-09-04T19:28:28.820619525+05:30" level=info msg="received task-delete event from containerd" container=5174d66c3a05042e6934331320f99542f709238ee771df3b4fb91a715808e410 module=libcontainerd namespace=moby topic=/tasks/delete type="*events.TaskDelete"
+Sep 04 19:28:53 colima dockerd[1544]: time="2026-09-04T19:28:53.428515365+05:30" level=info msg="sbJoin: gwep4 ''->'3e4d69cebdf8', gwep6 ''->''" eid=3e4d69cebdf8 ep=userdemo net=bridge nid=f48445827b2c
+Sep 04 19:28:58 colima dockerd[1544]: time="2026-09-04T19:28:58.101284518+05:30" level=info msg="received task-delete event from containerd" container=0c0a6a9f291401e0c7a6ecf8d2b902efb32b466ce1be2772d93225ae7408ba90 module=libcontainerd namespace=moby topic=/tasks/delete type="*events.TaskDelete"
+(stopped)
+
+################ 4. Filter by priority: errors and worse ################
+# scoped to one unit, which is how you would actually use it when
+# investigating a specific service rather than the whole system:
+$ journalctl -p warning -b -u docker.service --no-pager | tail -8
+-- No entries --
+
+$ journalctl -p err -b -u docker.service --no-pager | tail -4
+-- No entries --
+(no output above = this service logged nothing at err or worse this boot)
+
+################ 5. Kernel messages only ################
+$ journalctl -k --until "10 min ago" -n 6 --no-pager
+Sep 04 00:15:11 colima kernel: br-81a11c1ab0f6: port 2(vethc244720) entered disabled state
+Sep 04 00:15:11 colima kernel: vethe191d32: renamed from eth0
+Sep 04 00:15:11 colima kernel: br-81a11c1ab0f6: port 2(vethc244720) entered disabled state
+Sep 04 00:15:11 colima kernel: vethc244720 (unregistering): left allmulticast mode
+Sep 04 00:15:11 colima kernel: vethc244720 (unregistering): left promiscuous mode
+Sep 04 00:15:11 colima kernel: br-81a11c1ab0f6: port 2(vethc244720) entered disabled state
+
+################ 6. Boots, and journal disk usage ################
+$ journalctl --list-boots --no-pager | tail -2
+IDX BOOT ID                          FIRST ENTRY                 LAST ENTRY
+  0 8f86c65268a44d5b9ab188f0d98c1dbf Thu 2026-09-03 23:26:40 IST Fri 2026-09-04 19:30:15 IST
+$ journalctl --disk-usage
+Archived and active journals take up 8.0M in the file system.

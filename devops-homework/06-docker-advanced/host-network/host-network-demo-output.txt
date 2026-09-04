@@ -1,0 +1,74 @@
+=== Docker Networking Task 2: Apache2 on the host network, port 80 ===
+Docker 29.5.2 on aarch64
+Date: Thu Sep  3 23:45:29 IST 2026
+
+NOTE ON PLATFORM: this Mac runs Docker inside a Colima Linux VM, so 'the Docker
+host' whose network namespace --network host shares is the VM, not macOS. Every
+check below is therefore run from inside that Docker host.
+
+################ 1. Pull the Apache2 image from Docker Hub ################
+$ docker pull httpd:2.4
+2.4: Pulling from library/httpd
+Digest: sha256:979c38c2228d28c2edfd45c6e27dcee1c7b4a101a5526721ae8ece454e89e99e
+Status: Image is up to date for httpd:2.4
+docker.io/library/httpd:2.4
+
+$ docker images httpd
+REPOSITORY   TAG          SIZE
+httpd        2.4          207MB
+httpd        2.4-alpine   107MB
+
+################ 2. Bridge mode first, for comparison ################
+$ docker run -d --name apache-bridge -p 8086:80 httpd:2.4
+abf82e761aa370192da78975a6b3b516030bd649b86359c72a34f73a2e7126f0
+$ docker port apache-bridge     # explicit publish needed
+80/tcp -> 0.0.0.0:8086
+80/tcp -> [::]:8086
+$ docker inspect apache-bridge --format "{{.NetworkSettings.IPAddress}}"  # its own IP
+
+template parsing error: template: :1:18: executing "" at <.NetworkSettings.IPAddress>: map has no entry for key "IPAddress"
+
+################ 3. Now run Apache2 with --network host on port 80 ################
+$ docker run -d --name apache-host --network host httpd:2.4
+add17bd197752e320fddb24231bfab1705a9b342ea4b964620017f613ed74e04
+
+$ docker ps
+NAMES         IMAGE                STATUS              PORTS                                         NETWORKS
+apache-host   httpd:2.4            Up 3 seconds                                                      host
+isolated      alpine               Up About a minute                                                 backend-net
+backend       alpine               Up About a minute                                                 db-net,frontend-net
+database      mysql:8.4            Up About a minute   3306/tcp, 33060/tcp                           db-net
+frontend      nginx:alpine         Up About a minute   0.0.0.0:8085->80/tcp, [::]:8085->80/tcp       frontend-net
+gohello       gohello-multistage   Up 5 minutes        0.0.0.0:8080->8080/tcp, [::]:8080->8080/tcp   bridge
+
+# No -p was given and no ports are listed, because there is no NAT: the
+# container binds port 80 directly in the Docker host network namespace.
+$ docker inspect apache-host --format "NetworkMode={{.HostConfig.NetworkMode}} own-networks={{len .NetworkSettings.Networks}}"
+NetworkMode=host own-networks=1 (host mode = no network of its own, hence no container IP)
+
+################ 4. Access the Apache website on port 80 ################
+# from inside the Docker host (the Colima VM):
+$ colima ssh -- curl -sS -o /dev/null -w "HTTP %{http_code}\n" http://localhost:80/
+HTTP 200
+
+$ colima ssh -- curl -sS http://localhost:80/
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<title>It works! Apache httpd</title>
+</head>
+<body>
+<p>It works!</p>
+</body>
+</html>
+
+$ colima ssh -- ss -tlnp | grep :80
+LISTEN 0      511                                   *:80              *:*          
+
+# and the port is genuinely bound in the host namespace, not forwarded:
+$ docker exec apache-host sh -c "hostname; ip addr show | grep -c inet"
+colima
+$ colima ssh -- hostname
+colima
+
+# ^ identical hostname/network namespace = the container shares the host stack.

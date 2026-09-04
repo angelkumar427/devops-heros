@@ -1,0 +1,40 @@
+=== Docker Networking Task 3: bind mount a host folder into Nginx ===
+Docker 29.5.2 on aarch64
+Date: Thu Sep  3 23:46:35 IST 2026
+
+################ 1. Create the folder and index.html on the local machine ################
+$ mkdir -p site && echo "<h1>Hello students</h1>" > site/index.html
+$ cat site/index.html
+<h1>Hello students</h1>
+
+################ 2. Bind mount that folder into an Nginx container ################
+$ docker run -d --name bindmount-demo -p 8088:80 -v "$PWD/site":/usr/share/nginx/html:ro nginx:alpine
+faaa9add2e7e2ba9de9c4e3a675df7f30469094028880482e3d253cb410af1d0
+
+$ docker inspect bindmount-demo --format "{{range .Mounts}}{{.Type}} {{.Source}} -> {{.Destination}} (rw={{.RW}}){{end}}"
+bind /Users/kumarangel/DevOps/devops-heros/devops-homework/06-docker-advanced/bind-mounts/site -> /usr/share/nginx/html (rw=false)
+
+################ 3. Access the Nginx website and verify the content ################
+$ curl -sS http://localhost:8088/
+<h1>Hello students</h1>
+
+################ 4. Modify index.html ON THE HOST (container left untouched) ################
+$ echo "<h1>Hello students - edited live on the host</h1>" > site/index.html
+$ docker ps --filter name=bindmount-demo   # note: NOT restarted, same uptime
+NAMES            STATUS
+bindmount-demo   Up 2 seconds
+
+################ 5. Verify the change is served WITHOUT restarting the container ################
+$ curl -sS http://localhost:8088/
+<h1>Hello students - edited live on the host</h1>
+
+# the container has never been restarted:
+$ docker inspect bindmount-demo --format "StartedAt={{.State.StartedAt}} Restarts={{.RestartCount}}"
+StartedAt=2026-09-03T18:16:35.80217703Z Restarts=0
+
+################ 6. The mount is read-only from the container side (:ro) ################
+$ docker exec bindmount-demo sh -c "echo hacked > /usr/share/nginx/html/index.html"
+sh: can't create /usr/share/nginx/html/index.html: Read-only file system
+exit=1 (non-zero: :ro blocks container writes, host stays authoritative)
+$ curl -sS http://localhost:8088/   # still the host content
+<h1>Hello students - edited live on the host</h1>

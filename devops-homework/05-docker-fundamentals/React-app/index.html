@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Hello World - React</title>
+  </head>
+  <body>
+    <div id="root">Hello World from React! (fallback text, replaced once React mounts)</div>
+
+    <!-- React & ReactDOM are vendored locally (production UMD builds) so the
+         container has zero runtime dependency on an external CDN. -->
+    <script src="/react.production.min.js"></script>
+    <script src="/react-dom.production.min.js"></script>
+    <script>
+      const e = React.createElement;
+      const App = () =>
+        e('div', null,
+          e('h1', null, 'Hello World from React!'),
+          e('p', null, 'Served by a Docker container (static build, Nginx, no CDN dependency).')
+        );
+      ReactDOM.createRoot(document.getElementById('root')).render(e(App));
+    </script>
+  </body>
+</html>

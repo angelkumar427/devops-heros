@@ -1,0 +1,42 @@
+=== git commit -m  vs  git commit -a -m ===
+
+$ echo "line1" > notes.txt
+$ git add notes.txt
+$ git commit -m "Add notes.txt"
+[master (root-commit) 7f0a73b] Add notes.txt
+ 1 file changed, 1 insertion(+)
+ create mode 100644 notes.txt
+
+# Now modify a file that is ALREADY tracked by git (no new/staged files)
+$ echo "line2" >> notes.txt
+$ git status --short   # notice it is modified but NOT staged
+ M notes.txt
+?? commit-demo-output.txt
+
+$ git commit -m "Add line2"   # <-- plain commit, nothing staged
+On branch master
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+	modified:   notes.txt
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+	commit-demo-output.txt
+
+no changes added to commit (use "git add" and/or "git commit -a")
+(exit code: 1)
+  -> FAILS / says "nothing added to commit" because -m alone only commits
+     what is already in the staging area (the index). The change to
+     notes.txt was never staged with git add, so there is nothing to commit.
+
+$ git commit -a -m "Add line2"   # <-- -a auto-stages tracked, modified files
+[master d296577] Add line2
+ 1 file changed, 1 insertion(+)
+  -> WORKS. -a automatically stages any file that git already tracks and
+     that has been modified or deleted (it will NOT pick up brand new,
+     untracked files - those still need an explicit git add).
+
+$ git log --oneline
+d296577 Add line2
+7f0a73b Add notes.txt

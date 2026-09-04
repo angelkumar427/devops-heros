@@ -1,0 +1,37 @@
+
+Report generated for 'Homework demo run' by root@162f64ad194f
+  -> /root/system_reports/report_20260903_184110.txt
+  -> /root/system_reports/processes_20260903_184110.txt
+
+Preview:
+----------------------------------------------------
+====================================================
+ SYSTEM REPORT
+====================================================
+Label       : Homework demo run
+Date        : Thu Sep  3 18:41:10 UTC 2026
+Hostname    : 162f64ad194f
+User        : root
+
+---- Disk usage (df -h) ----------------------------
+Filesystem             Size  Used Avail Use% Mounted on
+overlay                 40G  3.7G   34G  10% /
+tmpfs                   64M     0   64M   0% /dev
+shm                     64M     0   64M   0% /dev/shm
+lima-ec133fa2e4f94f92  927G  112G  815G  13% /hw
+/dev/vdb1               40G  3.7G   34G  10% /etc/hosts
+tmpfs                  2.9G     0  2.9G   0% /proc/acpi
+tmpfs                  2.9G     0  2.9G   0% /proc/scsi
+tmpfs                  2.9G     0  2.9G   0% /sys/firmware
+
+---- Disk usage of home directory (du -sh) ---------
+20K	/root
+
+---- Top 8 processes by CPU usage --------------
+USER         PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND
+root           1  0.0  0.0   2300  1248 ?        Ss   18:41   0:00 sleep 600
+root          46  0.0  0.0      0     0 ?        Z    18:41   0:00 [dpkg-preconfigu] <defunct>
+root         135  0.0  0.0   2404  1468 ?        Ss   18:41   0:00 sh -c ./system-report.sh < /tmp/answers.txt > /tmp/run-output.txt 2>&1
+root         141  0.0  0.0   3900  3000 ?        S    18:41   0:00 bash ./system-report.sh
+root         151  0.0  0.0   6004  3272 ?        R    18:41   0:00 ps aux --sort=-%cpu
+root         152  0.0  0.0   2312  1196 ?        S    18:41   0:00 head -n 9

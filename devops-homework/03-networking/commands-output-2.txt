@@ -1,0 +1,71 @@
+=== Networking fundamentals commands - captured output (part 2) ===
+Run on: Linux 6.8.0-117-generic aarch64, Debian container
+Date: Fri Sep  4 13:55:27 UTC 2026
+
+$ dig +short github.com
+20.207.73.82
+
+$ dig github.com
+
+; <<>> DiG 9.20.26-1~deb13u1-Debian <<>> github.com
+;; global options: +cmd
+;; Got answer:
+;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 57779
+;; flags: qr rd ra; QUERY: 1, ANSWER: 1, AUTHORITY: 0, ADDITIONAL: 0
+
+;; QUESTION SECTION:
+;github.com.			IN	A
+
+;; ANSWER SECTION:
+github.com.		0	IN	A	20.207.73.82
+
+;; Query time: 0 msec
+;; SERVER: 192.168.5.1#53(192.168.5.1) (UDP)
+;; WHEN: Fri Sep 04 13:55:27 UTC 2026
+;; MSG SIZE  rcvd: 54
+
+
+$ nslookup github.com
+Server:		192.168.5.1
+Address:	192.168.5.1#53
+
+Non-authoritative answer:
+Name:	github.com
+Address: 20.207.73.82
+
+
+$ curl -I https://api.github.com
+HTTP/2 200 
+date: Fri, 04 Sep 2026 13:55:23 GMT
+cache-control: public, max-age=60, s-maxage=60
+vary: Accept,Accept-Encoding, Accept, X-Requested-With
+x-github-api-version-selected: 2022-11-28
+access-control-expose-headers: ETag, Link, Location, Retry-After, X-GitHub-OTP, X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Used, X-RateLimit-Resource, X-RateLimit-Reset, X-OAuth-Scopes, X-Accepted-OAuth-Scopes, X-Poll-Interval, X-GitHub-Media-Type, X-GitHub-SSO, X-GitHub-Request-Id, Deprecation, Sunset, Warning
+access-control-allow-origin: *
+strict-transport-security: max-age=31536000; includeSubdomains; preload
+x-frame-options: deny
+x-content-type-options: nosniff
+x-xss-protection: 0
+referrer-policy: origin-when-cross-origin, strict-origin-when-cross-origin
+
+$ ss -tulpn
+Netid State  Recv-Q Send-Q Local Address:Port Peer Address:PortProcess                      
+tcp   LISTEN 0      1            0.0.0.0:8000      0.0.0.0:*    users:(("nc",pid=3518,fd=3))
+
+$ traceroute -m 5 8.8.8.8
+traceroute to 8.8.8.8 (8.8.8.8), 5 hops max, 60 byte packets
+ 1  172.17.0.1 (172.17.0.1)  0.094 ms  0.009 ms  0.008 ms
+ 2  * * *
+ 3  * * *
+ 4  * * *
+ 5  * * *
+
+$ nc -zv -w3 8.8.8.8 443
+Connection to 8.8.8.8 443 port [tcp/*] succeeded!
+
+$ nc -zv -w3 github.com 443
+Connection to github.com (20.207.73.82) 443 port [tcp/*] succeeded!
+
+$ nc -zv -w3 8.8.8.8 23     # a port that is NOT open
+nc: connect to 8.8.8.8 port 23 (tcp) timed out: Operation now in progress
+exit=1

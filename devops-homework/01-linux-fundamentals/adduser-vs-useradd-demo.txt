@@ -1,0 +1,74 @@
+=== adduser vs useradd - hands-on comparison ===
+Run on: Debian GNU/Linux 13 (trixie), aarch64
+Date: Fri Sep  4 13:58:57 UTC 2026
+
+################ What each command actually is ################
+$ file /usr/sbin/adduser /usr/sbin/useradd
+/usr/sbin/adduser: Perl script text executable
+/usr/sbin/useradd: ELF 64-bit LSB pie executable, ARM aarch64, version 1 (SYSV), dynamically linked, interpreter /lib/ld-linux-aarch64.so.1, BuildID[sha1]=1e14c7b9a4ccff18bb5a129d6a27541f60acdf17, for GNU/Linux 3.7.0, stripped
+
+# adduser is a Perl SCRIPT that wraps useradd; useradd is the compiled binary.
+
+################ 1. Create a test user the RECOMMENDED way (adduser) ################
+$ adduser --disabled-password --gecos "" testuser
+usermod: no changes
+
+# what adduser set up for us:
+$ getent passwd testuser
+testuser:x:1000:1000::/home/testuser:/bin/bash
+$ getent group testuser
+testuser:x:1000:
+$ id testuser
+uid=1000(testuser) gid=1000(testuser) groups=1000(testuser),100(users)
+$ ls -la /home/testuser
+total 20
+drwx------ 2 testuser testuser 4096 Sep  4 13:58 .
+drwxr-xr-x 1 root     root     4096 Sep  4 13:58 ..
+-rw-r--r-- 1 testuser testuser  220 Sep  4 13:58 .bash_logout
+-rw-r--r-- 1 testuser testuser 3526 Sep  4 13:58 .bashrc
+-rw-r--r-- 1 testuser testuser  807 Sep  4 13:58 .profile
+
+# ^ home directory created AND populated with skeleton files from /etc/skel,
+#   a matching group was created, and a login shell was set - all automatically.
+
+################ 2. Now the same thing with bare useradd ################
+$ useradd testuser2
+
+$ getent passwd testuser2
+testuser2:x:1001:1001::/home/testuser2:/bin/sh
+$ ls -la /home/ | grep testuser
+drwx------ 2 testuser testuser 4096 Sep  4 13:58 testuser
+$ ls -la /home/testuser2 2>&1
+ls: cannot access '/home/testuser2': No such file or directory
+
+# ^ NO home directory. The account exists but has nowhere to live, and the
+#   shell defaults to /bin/sh rather than a real login shell.
+
+################ 3. useradd done properly needs explicit flags ################
+$ useradd -m -s /bin/bash testuser3
+$ getent passwd testuser3
+testuser3:x:1002:1002::/home/testuser3:/bin/bash
+$ ls -A /home/testuser3
+.bash_logout
+.bashrc
+.profile
+
+# ^ -m creates the home dir, -s sets the shell. adduser did both for free.
+
+################ 4. Side-by-side result ################
+USER         PASSWD-ENTRY                 HOME-EXISTS    SHELL
+testuser     /home/testuser               yes            /bin/bash
+testuser2    /home/testuser2              NO             /bin/sh
+testuser3    /home/testuser3              yes            /bin/bash
+
+################ 5. Cleanup ################
+$ deluser --remove-home testuser
+warn: `/usr/bin/crontab' not executed. Skipping crontab removal. Package `cron' required.
+$ userdel -r testuser2; userdel -r testuser3
+userdel: testuser2 home directory (/home/testuser2) not found
+userdel: testuser3 mail spool (/var/mail/testuser3) not found
+
+$ getent passwd testuser testuser2 testuser3
+getent exit=2 (2 = none of the three exist any more)
+$ ls /home/
+# ^ empty: adduser/deluser and useradd -m/userdel -r leave nothing behind.

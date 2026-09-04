@@ -1,0 +1,9 @@
+# Naive single-stage version, for size comparison ONLY.
+# Ships the entire Go toolchain in the final image, even though it's
+# never needed at runtime - just to build the binary and run it.
+FROM golang:1.22-alpine
+WORKDIR /src
+COPY main.go .
+RUN CGO_ENABLED=0 GOOS=linux go build -o /out/server main.go
+EXPOSE 8080
+ENTRYPOINT ["/out/server"]
