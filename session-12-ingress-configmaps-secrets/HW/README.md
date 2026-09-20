@@ -16,6 +16,24 @@ Every command output and screenshot in these folders came from a real run on tha
 | 2 | **Secrets** | Decoded a "secret" in one command; tmpfs mount verified; the trailing-newline bug reproduced (14 vs 15 bytes) | [`02-secret/`](./02-secret/) |
 | 3 | **Ingress** | Path routing on one IP; found and fixed a real bug in the provided manifest (`rewrite-target`) | [`03-ingress/`](./03-ingress/) |
 | 4 | **Full demo** | All three wired together — backend renders a page from its own injected config and secrets | [`04-full-demo/`](./04-full-demo/) |
+| 5 | **Ingress vs Controller** | Architecture, separation of concerns, side-by-side comparison & examples | [`05-ingress-vs-controller/`](./05-ingress-vs-controller/) |
+
+## Evidence at a glance
+
+| ConfigMap — volume hot-reloads, env var does not | Secret — the base64 newline bug |
+|---|---|
+| ![cm](./01-configmap/02-hot-reload-vs-env.png) | ![sec](./02-secret/02-base64-newline-bug.png) |
+
+![ing](./03-ingress/02-path-routing.png)
+
+Browser captures through the Ingress — one IP, one port, two backends:
+
+| `http://yatri.local/` | `http://yatri.local/api` |
+|---|---|
+| ![fe](./04-full-demo/02-browser-frontend.png) | ![be](./04-full-demo/03-browser-backend-injected.png) |
+
+The `/api` page is rendered by the backend from values injected out of a ConfigMap and a
+Secret, so it proves all three mechanisms at once.
 
 ## The three ideas, in one line each
 

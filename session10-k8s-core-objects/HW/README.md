@@ -17,6 +17,20 @@
 | **Recreate** | Downtime captured: `readyReplicas` hit **0** mid-rollout | [`04-recreate/`](./04-recreate/) |
 | **Troubleshooting** | Selector mismatch rejected at admission; broken image stalled a rollout with 3/3 still available | [`troubleshooting/`](./troubleshooting/) |
 
+## Evidence at a glance
+
+| Rolling update — two ReplicaSets trading places | Recreate — downtime captured (`ready=0`) |
+|---|---|
+| ![ru](./01-rolling-update/01-rolling-update.png) | ![rc](./04-recreate/01-recreate-downtime.png) |
+
+| Blue-green — one selector edit moves all traffic | Canary — measured 180 / 20 |
+|---|---|
+| ![bg](./02-blue-green/01-blue-green-switch.png) | ![cn](./03-canary/02-traffic-split-measured.png) |
+
+| Pod lifecycle — 12 states, STATUS ≠ phase | Troubleshooting — broken rollout, 3/3 still up |
+|---|---|
+| ![pl](./pod-lifecycle/02-diagnosing-each-state.png) | ![ts](./troubleshooting/01-troubleshooting-drills.png) |
+
 ## The four deployment strategies, compared
 
 | Strategy | Downtime | Extra capacity | Versions live at once | Rollback speed |

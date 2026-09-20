@@ -8,7 +8,18 @@ command output in these folders was captured from an actual run.
 > **Cluster:** k3s `v1.35.0+k3s1` on a single node (`colima`), running in a Colima VM on
 > macOS/Apple Silicon. Pod subnet `10.42.0.0/16`, Service subnet `10.43.0.0/16`, CoreDNS at `10.43.0.10`.
 
-## The five Service types
+## Overview & Assignment Tasks
+
+| Task | Topic | Deliverables | Folder |
+|---|---|---|---|
+| **Task 1** | **Kubernetes Services** | All 5 Service types (YAML, verification, screenshots) | [`01-clusterip/`](./01-clusterip/) to [`05-headless/`](./05-headless/) |
+| **Task 2** | **Object Comparison** | Deployment vs ReplicaSet vs DaemonSet vs StatefulSet vs Service | [`06-comparisons/`](./06-comparisons/) |
+| **Task 3** | **FQDN** | Fully Qualified Domain Names, syntax, resolution flow, examples | [`fqdn/`](./fqdn/) |
+| **Task 4** | **CoreDNS** | Architecture, Corefile configuration, plugin chain, troubleshooting | [`coredns/`](./coredns/) |
+
+---
+
+## Task 1: The Five Service Types
 
 | # | Type | What it does | Proof captured | Folder |
 |---|---|---|---|---|
@@ -17,6 +28,24 @@ command output in these folders was captured from an actual run.
 | 3 | **LoadBalancer** | NodePort **+** a real external IP from the infrastructure. | `EXTERNAL-IP 192.168.5.1`, served on port 80; all three paths verified | [`03-loadbalancer/`](./03-loadbalancer/) |
 | 4 | **ExternalName** | Pure DNS CNAME to a host *outside* the cluster. No VIP, no endpoints. | CNAME resolution; plus a working target reached end-to-end | [`04-externalname/`](./04-externalname/) |
 | 5 | **Headless** | `clusterIP: None` — DNS returns every Pod IP, each Pod gets its own name. | All 3 Pod IPs from one lookup; identity survived a Pod restart | [`05-headless/`](./05-headless/) |
+
+## Evidence at a glance
+
+| ClusterIP — in-cluster access 3 ways | NodePort — reached from outside |
+|---|---|
+| ![clusterip](./01-clusterip/03-access-from-cluster.png) | ![nodeport](./02-nodeport/02-external-access.png) |
+
+| LoadBalancer — real EXTERNAL-IP | Headless — identity survives a restart |
+|---|---|
+| ![lb](./03-loadbalancer/01-service-external-ip.png) | ![headless](./05-headless/02-stable-identity.png) |
+
+![externalname](./04-externalname/01-externalname-cname.png)
+
+Browser captures of the actual served pages:
+
+| ClusterIP via port-forward | NodePort :30080 | LoadBalancer :80 |
+|---|---|---|
+| ![a](./01-clusterip/04-browser-via-port-forward.png) | ![b](./02-nodeport/03-browser-nodeport-30080.png) | ![c](./03-loadbalancer/03-browser-loadbalancer-port80.png) |
 
 ## How they relate
 
