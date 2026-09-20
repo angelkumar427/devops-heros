@@ -1,0 +1,34 @@
+# Same as ingress-routes.yaml, plus the rewrite-target annotation that the
+# capture-group regex in the path is designed to work with.
+#   path: /api(/|$)(.*)   ->  $2 is everything AFTER /api
+#   rewrite-target: /$2   ->  send that to the backend instead of the full path
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: yatri-ingress
+  labels:
+    app: yatri-app
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: yatri.local
+      http:
+        paths:
+          - path: /api(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: yatri-backend-service
+                port:
+                  number: 80
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: yatri-frontend-service
+                port:
+                  number: 80

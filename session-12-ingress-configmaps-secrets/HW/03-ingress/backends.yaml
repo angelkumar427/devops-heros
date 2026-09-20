@@ -1,0 +1,57 @@
+apiVersion: v1
+kind: ConfigMap
+metadata: { name: frontend-html }
+data:
+  index.html: "<h1>FRONTEND</h1><p>served by yatri-frontend-service at path /</p>\n"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata: { name: backend-html }
+data:
+  index.html: "<h1>BACKEND API</h1><p>served by yatri-backend-service at path /api</p>\n"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: yatri-frontend, labels: { app: yatri-frontend } }
+spec:
+  replicas: 2
+  selector: { matchLabels: { app: yatri-frontend } }
+  template:
+    metadata: { labels: { app: yatri-frontend } }
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.25-alpine
+          ports: [{ containerPort: 80 }]
+          volumeMounts: [{ name: html, mountPath: /usr/share/nginx/html }]
+      volumes: [{ name: html, configMap: { name: frontend-html } }]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: yatri-backend, labels: { app: yatri-backend } }
+spec:
+  replicas: 2
+  selector: { matchLabels: { app: yatri-backend } }
+  template:
+    metadata: { labels: { app: yatri-backend } }
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.25-alpine
+          ports: [{ containerPort: 80 }]
+          volumeMounts: [{ name: html, mountPath: /usr/share/nginx/html }]
+      volumes: [{ name: html, configMap: { name: backend-html } }]
+---
+apiVersion: v1
+kind: Service
+metadata: { name: yatri-frontend-service }
+spec:
+  selector: { app: yatri-frontend }
+  ports: [{ name: http, port: 80, targetPort: 80 }]
+---
+apiVersion: v1
+kind: Service
+metadata: { name: yatri-backend-service }
+spec:
+  selector: { app: yatri-backend }
+  ports: [{ name: http, port: 80, targetPort: 80 }]

@@ -1,0 +1,9 @@
+# A second ExternalName Service pointing at a domain that really resolves,
+# so the alias can be followed end-to-end with a real HTTP request.
+apiVersion: v1
+kind: Service
+metadata:
+  name: external-web-service
+spec:
+  type: ExternalName
+  externalName: example.com

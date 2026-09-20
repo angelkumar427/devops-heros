@@ -1,0 +1,33 @@
+# One pod consuming the SAME ConfigMap three different ways, so the
+# difference between them (especially hot-reload) can be observed.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: config-consumer
+  labels:
+    app: config-demo
+spec:
+  containers:
+    - name: app
+      image: alpine:3.19
+      command: ["sh", "-c", "sleep 3600"]
+      env:
+        # 1. a single key, picked out explicitly
+        - name: APP_ENVIRONMENT
+          valueFrom:
+            configMapKeyRef:
+              name: yatri-app-config
+              key: ENVIRONMENT
+      envFrom:
+        # 2. every key in the ConfigMap, injected as env vars
+        - configMapRef:
+            name: yatri-app-config
+      volumeMounts:
+        # 3. the whole ConfigMap projected as files
+        - name: config-volume
+          mountPath: /etc/appconfig
+          readOnly: true
+  volumes:
+    - name: config-volume
+      configMap:
+        name: yatri-app-config
