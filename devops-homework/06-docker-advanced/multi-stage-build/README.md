@@ -1,4 +1,17 @@
-# Multi-stage builds
+# Session 7 — Docker Images: Multi-stage builds
+
+**Homework submission** · Angel Kumar · 24bcs10011
+
+| Requirement | Evidence |
+|---|---|
+| Build and run the multi-stage `Dockerfile` | [Build, run and verify](#build-run-and-verify) |
+| Application running successfully | `curl` output below + [browser screenshot](#screenshot) |
+| `docker ps` showing the container on port 8080 | [Build, run and verify](#build-run-and-verify) |
+| Three or more application types deployed with Docker | six (Node.js, Python, Java, Apache, React, Nginx) in [`../../05-docker-fundamentals/`](../../05-docker-fundamentals/) |
+
+The same evidence as a one-page checklist: [`SUBMISSION.md`](./SUBMISSION.md).
+
+## What a multi-stage build is
 
 A multi-stage `Dockerfile` uses more than one `FROM` in the same file. Each `FROM` starts a fresh, independent stage; later stages can `COPY --from=<stage>` selected files out of an earlier one. Only the **final** stage becomes the image you actually get — everything from earlier stages (compilers, source, package caches, headers) is left behind unless explicitly copied forward.
 
