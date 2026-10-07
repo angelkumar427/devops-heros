@@ -1,0 +1,27 @@
+# Desired state, kept in Git. Argo CD makes the cluster match THIS file.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gitops-demo
+  labels: { app: gitops-demo }
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: gitops-demo }
+  template:
+    metadata:
+      labels: { app: gitops-demo }
+    spec:
+      containers:
+        - name: podinfo
+          image: ghcr.io/stefanprodan/podinfo:6.7.1
+          env:
+            - name: PODINFO_UI_MESSAGE
+              value: "Deployed by Argo CD from Git - version 1"
+          ports:
+            - { name: http, containerPort: 9898 }
+          readinessProbe:
+            httpGet: { path: /readyz, port: http }
+          resources:
+            requests: { cpu: 20m, memory: 32Mi }
+            limits: { cpu: 200m, memory: 128Mi }

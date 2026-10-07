@@ -1,0 +1,21 @@
+# The Argo CD Application: "keep namespace gitops-demo in sync with this path in Git".
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: gitops-demo
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/angelkumar427/devops-heros.git
+    targetRevision: main
+    path: session20-monitoring-observability-gitops/HW/03-gitops/app
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: gitops-demo
+  syncPolicy:
+    automated:
+      prune: true      # delete resources that were removed from Git
+      selfHeal: true   # undo manual changes made directly in the cluster
+    syncOptions:
+      - CreateNamespace=true
