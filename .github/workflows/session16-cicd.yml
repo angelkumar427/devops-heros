@@ -1,0 +1,164 @@
+# Session 16 - CI/CD demo pipeline
+# Project: session-16-github-actions/HW/cicd-demo
+#
+#   test (matrix)  ->  build & push image  ->  deploy to Kubernetes
+#   \______________ CI ________________/       \______ CD ______/
+name: Session 16 - CI/CD Pipeline
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "session-16-github-actions/**"
+      - ".github/workflows/session16-cicd.yml"
+  pull_request:
+    paths:
+      - "session-16-github-actions/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write        # needed to push to GitHub Container Registry
+
+env:
+  PROJECT_DIR: session-16-github-actions/HW/cicd-demo
+  IMAGE_NAME: session16-calculator
+
+jobs:
+  # ─────────────────────────────── CI ───────────────────────────────
+  test:
+    name: Test (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12"]
+    defaults:
+      run:
+        working-directory: ${{ env.PROJECT_DIR }}
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v6
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: Run unit tests with coverage
+        run: |
+          python -m pytest -v \
+            --junitxml=test-results.xml \
+            --cov=app --cov-report=term --cov-report=xml:coverage.xml
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-py${{ matrix.python-version }}
+          path: |
+            ${{ env.PROJECT_DIR }}/test-results.xml
+            ${{ env.PROJECT_DIR }}/coverage.xml
+
+  build:
+    name: Build & push image
+    needs: test
+    runs-on: ubuntu-latest
+    outputs:
+      image: ${{ steps.meta.outputs.image }}
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v6
+
+      - name: Compute image name (GHCR needs lowercase)
+        id: meta
+        run: |
+          OWNER="${GITHUB_REPOSITORY_OWNER,,}"
+          IMAGE="ghcr.io/${OWNER}/${IMAGE_NAME}:${GITHUB_SHA::7}"
+          echo "image=${IMAGE}" >> "$GITHUB_OUTPUT"
+          echo "Image will be: ${IMAGE}"
+
+      - name: Build image
+        run: |
+          docker build \
+            --build-arg APP_VERSION=${GITHUB_SHA::7} \
+            -t "${{ steps.meta.outputs.image }}" \
+            "${PROJECT_DIR}"
+
+      - name: Smoke-test the image before pushing
+        run: |
+          docker run -d --name smoke -p 8080:8080 "${{ steps.meta.outputs.image }}"
+          for i in $(seq 1 20); do curl -fs localhost:8080/health && break; sleep 1; done
+          echo
+          curl -fs "localhost:8080/add?a=2&b=3"
+          echo
+          docker rm -f smoke
+
+      - name: Log in to GitHub Container Registry
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}   # built-in secret, scoped to this run
+
+      - name: Push image
+        if: github.event_name != 'pull_request'
+        run: docker push "${{ steps.meta.outputs.image }}"
+
+      - name: Record build info as an artifact
+        run: |
+          mkdir -p build-info
+          {
+            echo "image=${{ steps.meta.outputs.image }}"
+            echo "commit=${GITHUB_SHA}"
+            echo "run=${GITHUB_RUN_ID}"
+            echo "built_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          } > build-info/build-info.txt
+          cat build-info/build-info.txt
+
+      - name: Upload build info
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-info
+          path: build-info/
+
+  # ─────────────────────────────── CD ───────────────────────────────
+  deploy:
+    name: Deploy to Kubernetes
+    needs: build
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v6
+
+      - name: Create a Kubernetes cluster (kind) on the runner
+        uses: helm/kind-action@v1
+        with:
+          cluster_name: cicd-demo
+
+      - name: Pull the image that CI just pushed
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          docker pull "${{ needs.build.outputs.image }}"
+          kind load docker-image "${{ needs.build.outputs.image }}" --name cicd-demo
+
+      - name: Deploy
+        run: |
+          sed "s|IMAGE_PLACEHOLDER|${{ needs.build.outputs.image }}|" \
+            "${PROJECT_DIR}/k8s/deployment.yaml" | kubectl apply -f -
+          kubectl rollout status deployment/calculator --timeout=120s
+          kubectl get deploy,pods,svc -l app=calculator -o wide
+
+      - name: Verify the deployed service
+        run: |
+          kubectl port-forward svc/calculator 8080:80 >/dev/null 2>&1 &
+          sleep 3
+          curl -fs localhost:8080/health; echo
+          curl -fs "localhost:8080/multiply?a=6&b=7"; echo
+          curl -fs "localhost:8080/divide?a=1&b=0" || echo "(divide by zero correctly rejected)"
