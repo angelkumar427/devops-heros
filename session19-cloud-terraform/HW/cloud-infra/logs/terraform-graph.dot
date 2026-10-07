@@ -1,0 +1,80 @@
+digraph {
+	compound = "true"
+	newrank = "true"
+	subgraph "root" {
+		"[root] aws_instance.web (expand)" [label = "aws_instance.web", shape = "box"]
+		"[root] aws_internet_gateway.igw (expand)" [label = "aws_internet_gateway.igw", shape = "box"]
+		"[root] aws_route_table.public (expand)" [label = "aws_route_table.public", shape = "box"]
+		"[root] aws_route_table_association.public (expand)" [label = "aws_route_table_association.public", shape = "box"]
+		"[root] aws_s3_bucket.assets (expand)" [label = "aws_s3_bucket.assets", shape = "box"]
+		"[root] aws_s3_bucket_public_access_block.assets (expand)" [label = "aws_s3_bucket_public_access_block.assets", shape = "box"]
+		"[root] aws_security_group.web (expand)" [label = "aws_security_group.web", shape = "box"]
+		"[root] aws_subnet.public (expand)" [label = "aws_subnet.public", shape = "box"]
+		"[root] aws_vpc.main (expand)" [label = "aws_vpc.main", shape = "box"]
+		"[root] data.aws_ami.amazon_linux (expand)" [label = "data.aws_ami.amazon_linux", shape = "box"]
+		"[root] data.aws_availability_zones.available (expand)" [label = "data.aws_availability_zones.available", shape = "box"]
+		"[root] provider[\"registry.terraform.io/hashicorp/aws\"]" [label = "provider[\"registry.terraform.io/hashicorp/aws\"]", shape = "diamond"]
+		"[root] provider[\"registry.terraform.io/hashicorp/random\"]" [label = "provider[\"registry.terraform.io/hashicorp/random\"]", shape = "diamond"]
+		"[root] random_id.bucket_suffix (expand)" [label = "random_id.bucket_suffix", shape = "box"]
+		"[root] var.aws_region" [label = "var.aws_region", shape = "note"]
+		"[root] var.emulator_endpoint" [label = "var.emulator_endpoint", shape = "note"]
+		"[root] var.environment" [label = "var.environment", shape = "note"]
+		"[root] var.instance_type" [label = "var.instance_type", shape = "note"]
+		"[root] var.project_name" [label = "var.project_name", shape = "note"]
+		"[root] var.public_subnet_cidr" [label = "var.public_subnet_cidr", shape = "note"]
+		"[root] var.ssh_allowed_cidr" [label = "var.ssh_allowed_cidr", shape = "note"]
+		"[root] var.use_local_emulator" [label = "var.use_local_emulator", shape = "note"]
+		"[root] var.vpc_cidr" [label = "var.vpc_cidr", shape = "note"]
+		"[root] aws_instance.web (expand)" -> "[root] aws_route_table_association.public (expand)"
+		"[root] aws_instance.web (expand)" -> "[root] aws_security_group.web (expand)"
+		"[root] aws_instance.web (expand)" -> "[root] data.aws_ami.amazon_linux (expand)"
+		"[root] aws_instance.web (expand)" -> "[root] var.instance_type"
+		"[root] aws_internet_gateway.igw (expand)" -> "[root] aws_vpc.main (expand)"
+		"[root] aws_route_table.public (expand)" -> "[root] aws_internet_gateway.igw (expand)"
+		"[root] aws_route_table_association.public (expand)" -> "[root] aws_route_table.public (expand)"
+		"[root] aws_route_table_association.public (expand)" -> "[root] aws_subnet.public (expand)"
+		"[root] aws_s3_bucket.assets (expand)" -> "[root] provider[\"registry.terraform.io/hashicorp/aws\"]"
+		"[root] aws_s3_bucket.assets (expand)" -> "[root] random_id.bucket_suffix (expand)"
+		"[root] aws_s3_bucket_public_access_block.assets (expand)" -> "[root] aws_s3_bucket.assets (expand)"
+		"[root] aws_security_group.web (expand)" -> "[root] aws_vpc.main (expand)"
+		"[root] aws_security_group.web (expand)" -> "[root] var.ssh_allowed_cidr (validation)"
+		"[root] aws_subnet.public (expand)" -> "[root] aws_vpc.main (expand)"
+		"[root] aws_subnet.public (expand)" -> "[root] data.aws_availability_zones.available (expand)"
+		"[root] aws_subnet.public (expand)" -> "[root] var.public_subnet_cidr"
+		"[root] aws_vpc.main (expand)" -> "[root] provider[\"registry.terraform.io/hashicorp/aws\"]"
+		"[root] aws_vpc.main (expand)" -> "[root] var.vpc_cidr"
+		"[root] data.aws_ami.amazon_linux (expand)" -> "[root] provider[\"registry.terraform.io/hashicorp/aws\"]"
+		"[root] data.aws_availability_zones.available (expand)" -> "[root] provider[\"registry.terraform.io/hashicorp/aws\"]"
+		"[root] output.ami_id (expand)" -> "[root] data.aws_ami.amazon_linux (expand)"
+		"[root] output.availability_zone (expand)" -> "[root] aws_subnet.public (expand)"
+		"[root] output.instance_id (expand)" -> "[root] aws_instance.web (expand)"
+		"[root] output.instance_private_ip (expand)" -> "[root] aws_instance.web (expand)"
+		"[root] output.instance_public_ip (expand)" -> "[root] aws_instance.web (expand)"
+		"[root] output.public_subnet_id (expand)" -> "[root] aws_subnet.public (expand)"
+		"[root] output.s3_bucket (expand)" -> "[root] aws_s3_bucket.assets (expand)"
+		"[root] output.security_group_id (expand)" -> "[root] aws_security_group.web (expand)"
+		"[root] output.vpc_id (expand)" -> "[root] aws_vpc.main (expand)"
+		"[root] provider[\"registry.terraform.io/hashicorp/aws\"] (close)" -> "[root] aws_instance.web (expand)"
+		"[root] provider[\"registry.terraform.io/hashicorp/aws\"] (close)" -> "[root] aws_s3_bucket_public_access_block.assets (expand)"
+		"[root] provider[\"registry.terraform.io/hashicorp/aws\"]" -> "[root] var.aws_region"
+		"[root] provider[\"registry.terraform.io/hashicorp/aws\"]" -> "[root] var.emulator_endpoint"
+		"[root] provider[\"registry.terraform.io/hashicorp/aws\"]" -> "[root] var.environment (validation)"
+		"[root] provider[\"registry.terraform.io/hashicorp/aws\"]" -> "[root] var.project_name"
+		"[root] provider[\"registry.terraform.io/hashicorp/aws\"]" -> "[root] var.use_local_emulator"
+		"[root] provider[\"registry.terraform.io/hashicorp/random\"] (close)" -> "[root] random_id.bucket_suffix (expand)"
+		"[root] random_id.bucket_suffix (expand)" -> "[root] provider[\"registry.terraform.io/hashicorp/random\"]"
+		"[root] root" -> "[root] output.ami_id (expand)"
+		"[root] root" -> "[root] output.availability_zone (expand)"
+		"[root] root" -> "[root] output.instance_id (expand)"
+		"[root] root" -> "[root] output.instance_private_ip (expand)"
+		"[root] root" -> "[root] output.instance_public_ip (expand)"
+		"[root] root" -> "[root] output.public_subnet_id (expand)"
+		"[root] root" -> "[root] output.s3_bucket (expand)"
+		"[root] root" -> "[root] output.security_group_id (expand)"
+		"[root] root" -> "[root] output.vpc_id (expand)"
+		"[root] root" -> "[root] provider[\"registry.terraform.io/hashicorp/aws\"] (close)"
+		"[root] root" -> "[root] provider[\"registry.terraform.io/hashicorp/random\"] (close)"
+		"[root] var.environment (validation)" -> "[root] var.environment"
+		"[root] var.ssh_allowed_cidr (validation)" -> "[root] var.ssh_allowed_cidr"
+	}
+}
