@@ -1,0 +1,15 @@
+# Corrected static claim.
+# storageClassName: "" (explicit empty string) opts OUT of dynamic provisioning,
+# so this PVC binds to a manually created PV instead of asking the default
+# StorageClass to make a new one. Omitting the field entirely is NOT the same.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: student-pvc-static
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: ""
+  resources:
+    requests:
+      storage: 500Mi

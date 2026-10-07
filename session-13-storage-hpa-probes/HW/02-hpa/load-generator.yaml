@@ -1,0 +1,31 @@
+# Load generator for the HPA demo.
+#
+# NOTE: a busybox `wget` loop is the obvious approach and it does NOT work here -
+# wget spawns a process per request, so the generators saturate the node's CPU
+# while nginx stays near idle. ApacheBench keeps thousands of requests in flight
+# from one cheap process, which is what actually moves the target's CPU.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: load-generator
+  labels:
+    app: load-generator
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: load-generator
+  template:
+    metadata:
+      labels:
+        app: load-generator
+    spec:
+      containers:
+        - name: loader
+          image: httpd:2.4-alpine
+          command: ["/bin/sh","-c"]
+          args:
+            - while true; do ab -c 120 -n 200000 -q http://hpa-demo-service/ >/dev/null 2>&1; done
+          resources:
+            requests:
+              cpu: "100m"
