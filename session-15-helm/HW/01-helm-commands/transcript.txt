@@ -1,0 +1,120 @@
+$ helm version --short
+v4.3.0+gbec5b06
+
+################ helm create - scaffold a chart ################
+$ helm create webapp
+Creating webapp
+$ find webapp -type f | sort
+  webapp/.helmignore
+  webapp/Chart.yaml
+  webapp/templates/NOTES.txt
+  webapp/templates/_helpers.tpl
+  webapp/templates/deployment.yaml
+  webapp/templates/hpa.yaml
+  webapp/templates/httproute.yaml
+  webapp/templates/ingress.yaml
+  webapp/templates/service.yaml
+  webapp/templates/serviceaccount.yaml
+  webapp/templates/tests/test-connection.yaml
+  webapp/values.yaml
+
+################ helm lint / template - check before installing ################
+$ helm lint webapp
+==> Linting webapp
+[INFO] Chart.yaml: icon is recommended
+
+1 chart(s) linted, 0 chart(s) failed
+$ helm template webapp ./webapp | grep -E "^kind:|^  name:"
+  kind: ServiceAccount	  name: webapp
+  kind: Service	  name: webapp
+  kind: Deployment	  name: webapp
+  kind: Pod	  name: "webapp-test-connection"
+
+################ helm install ################
+$ helm install webapp ./webapp --set image.tag=1.27
+NAME: webapp
+LAST DEPLOYED: Wed Oct  7 18:05:31 2026
+NAMESPACE: default
+STATUS: deployed
+REVISION: 1
+DESCRIPTION: Install complete
+
+################ helm list ################
+$ helm list
+NAME  	NAMESPACE	REVISION	UPDATED                             	STATUS  	CHART       	APP VERSION
+webapp	default  	1       	2026-10-07 18:05:31.426579 +0530 IST	deployed	webapp-0.1.0	1.16.0     
+
+################ helm status ################
+$ helm status webapp | head -7
+NAME: webapp
+LAST DEPLOYED: Wed Oct  7 18:05:31 2026
+NAMESPACE: default
+STATUS: deployed
+REVISION: 1
+DESCRIPTION: Install complete
+RESOURCES:
+
+################ helm get - what Helm stored for this release ################
+$ helm get values webapp
+USER-SUPPLIED VALUES:
+image:
+  tag: "1.27"
+$ helm get manifest webapp | grep -E "^kind:" | sort | uniq -c
+   1 kind: Deployment
+   1 kind: Service
+   1 kind: ServiceAccount
+
+################ helm upgrade ################
+$ helm upgrade webapp ./webapp --set image.tag=1.27 --set replicaCount=3
+Release "webapp" has been upgraded. Happy Helming!
+NAME: webapp
+LAST DEPLOYED: Wed Oct  7 18:05:32 2026
+NAMESPACE: default
+$ kubectl get deploy webapp
+NAME     READY   UP-TO-DATE   AVAILABLE   AGE
+webapp   3/3     3            3           12s
+
+################ helm history ################
+$ helm history webapp
+REVISION	UPDATED                 	STATUS    	CHART       	APP VERSION	DESCRIPTION     
+1       	Wed Oct  7 18:05:31 2026	superseded	webapp-0.1.0	1.16.0     	Install complete
+2       	Wed Oct  7 18:05:32 2026	deployed  	webapp-0.1.0	1.16.0     	Upgrade complete
+
+################ helm rollback ################
+$ helm rollback webapp 1
+Rollback was a success! Happy Helming!
+$ kubectl get deploy webapp
+NAME     READY   UP-TO-DATE   AVAILABLE   AGE
+webapp   1/1     1            1           12s
+$ helm history webapp
+REVISION	UPDATED                 	STATUS    	CHART       	APP VERSION	DESCRIPTION     
+1       	Wed Oct  7 18:05:31 2026	superseded	webapp-0.1.0	1.16.0     	Install complete
+2       	Wed Oct  7 18:05:32 2026	superseded	webapp-0.1.0	1.16.0     	Upgrade complete
+3       	Wed Oct  7 18:05:43 2026	deployed  	webapp-0.1.0	1.16.0     	Rollback to 1   
+
+################ helm repo / search - charts from a repository ################
+$ helm repo add bitnami https://charts.bitnami.com/bitnami
+"bitnami" has been added to your repositories
+$ helm repo update
+Update Complete. ⎈Happy Helming!⎈
+$ helm repo list
+NAME   	URL                               
+bitnami	https://charts.bitnami.com/bitnami
+$ helm search repo bitnami/nginx
+NAME                            	CHART VERSION	APP VERSION	DESCRIPTION                                       
+bitnami/nginx                   	25.2.1       	1.31.6     	NGINX Open Source is a web server that can be a...
+bitnami/nginx-ingress-controller	12.0.7       	1.13.1     	NGINX Ingress Controller is an Ingress controll...
+bitnami/nginx-intel             	2.1.15       	0.4.9      	DEPRECATED NGINX Open Source for Intel is a lig...
+$ helm search hub redis --max-col-width 50 | head -4
+URL                                               	CHART VERSION            	APP VERSION         	DESCRIPTION                                       
+https://artifacthub.io/packages/helm/redis-arm/...	17.8.0                   	7.0.8               	Redis(R) is an open source, advanced key-value ...
+https://artifacthub.io/packages/helm/magefleet-...	0.1.0                    	7.2                 	A Helm chart for Redis 7.2 with persistence and...
+https://artifacthub.io/packages/helm/scalified-...	8.8.3                    	8.8.3               	Redis Helm Chart                                  
+
+################ helm uninstall ################
+$ helm uninstall webapp
+release "webapp" uninstalled
+$ helm list
+NAME	NAMESPACE	REVISION	UPDATED	STATUS	CHART	APP VERSION
+$ kubectl get deploy webapp
+Error from server (NotFound): deployments.apps "webapp" not found

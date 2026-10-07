@@ -1,0 +1,48 @@
+$ helm lint ./notes-chart
+1 chart(s) linted, 0 chart(s) failed
+$ helm template notes ./notes-chart | grep -E "^kind:"
+  kind: ConfigMap
+  kind: Service
+  kind: Deployment
+
+################ DEVELOPMENT  (values.yaml) ################
+$ helm install notes ./notes-chart
+NAME: notes
+NAMESPACE: default
+STATUS: deployed
+REVISION: 1
+  image       : nginx:1.24
+  replicas    : 1/1
+  environment : development
+  in the pod  : ENVIRONMENT=development APP_NAME=notes-app 
+  HTTP :30090 : 200
+
+################ PRODUCTION  (same chart, values-prod.yaml) ################
+$ helm upgrade notes ./notes-chart -f values-prod.yaml
+Release "notes" has been upgraded. Happy Helming!
+REVISION: 2
+  image       : nginx:1.25
+  replicas    : 3/3
+  environment : production
+  in the pod  : ENVIRONMENT=production APP_NAME=notes-app 
+  HTTP :30090 : 200
+
+$ kubectl get all -l app=notes
+  deployment.apps/notes-deploy       3/3 3
+  pod/notes-deploy-79b4665c4c-f8hzn  1/1 Running
+  pod/notes-deploy-79b4665c4c-rsgmk  1/1 Running
+  pod/notes-deploy-79b4665c4c-zjjg5  1/1 Running
+
+$ helm history notes
+REVISION	UPDATED                 	STATUS    	CHART            	APP VERSION	DESCRIPTION     
+1       	Wed Oct  7 18:08:06 2026	superseded	notes-chart-0.1.0	1.0        	Install complete
+2       	Wed Oct  7 18:08:32 2026	deployed  	notes-chart-0.1.0	1.0        	Upgrade complete
+
+################ Production broke? Roll back to development in one command ################
+$ helm rollback notes 1
+Rollback was a success! Happy Helming!
+  image       : nginx:1.24
+  replicas    : 1/1
+  environment : development
+  in the pod  : ENVIRONMENT=development APP_NAME=notes-app 
+  HTTP :30090 : 200
