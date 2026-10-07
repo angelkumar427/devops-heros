@@ -16,4 +16,7 @@ ENV APP_VERSION=${APP_VERSION} PORT=8080 DATA_DIR=/data PYTHONDONTWRITEBYTECODE=
 USER appuser
 EXPOSE 8080
 
-CMD ["gunicorn", "--bind", "0.0.0.0:8080", "--workers", "2", "--access-logfile", "-", "app.server:app"]
+# One worker process with threads: every scrape of /metrics then sees the same registry.
+# (With several workers each keeps its own counters, scrapes alternate between them and
+#  rate() reads the jumps as counter resets.) Scale out with replicas, not workers.
+CMD ["gunicorn", "--bind", "0.0.0.0:8080", "--workers", "1", "--threads", "4", "--access-logfile", "-", "app.server:app"]

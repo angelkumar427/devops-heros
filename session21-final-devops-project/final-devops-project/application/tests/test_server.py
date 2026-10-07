@@ -65,7 +65,18 @@ def test_enforces_max_tasks(client):
 def test_metrics_exposed(client):
     client.get("/healthz")
     body = client.get("/metrics").get_data(as_text=True)
-    assert "tasks_http_requests_total" in body
+    assert 'tasks_http_requests_total{method="GET",path="/healthz",status="200"} 1.0' in body
+    assert 'endpoint="' not in body  # would collide with Prometheus Operator's target label
+
+
+def test_tasks_stored_gauge_reflects_disk_after_restart(tmp_path, monkeypatch):
+    (tmp_path / "tasks.json").write_text(json.dumps([{"id": 1, "title": "a", "done": False}] * 3))
+    monkeypatch.setenv("DATA_DIR", str(tmp_path))
+    from app import server
+
+    importlib.reload(server)  # a "new pod" that has not written anything yet
+    body = server.app.test_client().get("/metrics").get_data(as_text=True)
+    assert "tasks_stored 3.0" in body
 
 
 def test_concurrent_writers_do_not_lose_tasks(tmp_path, monkeypatch):

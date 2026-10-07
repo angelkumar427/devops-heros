@@ -1,0 +1,15 @@
+{{- $min := ternary .Values.autoscaling.minReplicas .Values.replicaCount .Values.autoscaling.enabled }}
+{{- if gt (int $min) 1 }}
+# Voluntary disruptions (node drain, cluster upgrade) may evict at most one pod at a time,
+# so the Service always keeps an endpoint. Deleting every pod by hand bypasses this and
+# gives a few seconds of 503s from the ingress - see the README's persistence test.
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "tt.name" . }}
+  labels: {{- include "tt.labels" . | nindent 4 }}
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels: {{- include "tt.selector" . | nindent 6 }}
+{{- end }}

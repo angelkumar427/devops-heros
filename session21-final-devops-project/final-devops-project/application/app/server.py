@@ -35,8 +35,10 @@ _lock = threading.Lock()
 # A dedicated registry rather than the process-global default, so the module can be
 # reloaded (as the tests do) without "Duplicated timeseries" errors.
 REGISTRY = CollectorRegistry()
-REQUESTS = Counter("tasks_http_requests_total", "HTTP requests", ["method", "endpoint", "status"], registry=REGISTRY)
-LATENCY = Histogram("tasks_http_request_duration_seconds", "Request latency", ["endpoint"], registry=REGISTRY)
+# The route label is "path", not "endpoint": Prometheus Operator attaches its own `endpoint`
+# target label (the Service port name) and would silently rename ours to exported_endpoint.
+REQUESTS = Counter("tasks_http_requests_total", "HTTP requests", ["method", "path", "status"], registry=REGISTRY)
+LATENCY = Histogram("tasks_http_request_duration_seconds", "Request latency", ["path"], registry=REGISTRY)
 TASKS = Gauge("tasks_stored", "Number of tasks currently stored", registry=REGISTRY)
 
 
@@ -76,7 +78,6 @@ def _save(tasks):
     with open(tmp, "w") as fh:
         json.dump(tasks, fh)
     os.replace(tmp, _path())  # atomic rename: no half-written file on crash
-    TASKS.set(len(tasks))
 
 
 @app.before_request
@@ -86,10 +87,10 @@ def _start():
 
 @app.after_request
 def _record(resp):
-    endpoint = request.url_rule.rule if request.url_rule else "unmatched"
-    if endpoint != "/metrics":
-        REQUESTS.labels(request.method, endpoint, resp.status_code).inc()
-        LATENCY.labels(endpoint).observe(time.perf_counter() - g.start)
+    path = request.url_rule.rule if request.url_rule else "unmatched"
+    if path != "/metrics":
+        REQUESTS.labels(request.method, path, resp.status_code).inc()
+        LATENCY.labels(path).observe(time.perf_counter() - g.start)
     return resp
 
 
@@ -118,6 +119,9 @@ def readyz():
 
 @app.get("/metrics")
 def metrics():
+    # Read from disk at scrape time: a freshly started pod must report the stored tasks,
+    # not 0 until its first write. (os.replace makes the file read atomic - no lock needed.)
+    TASKS.set(len(_load()))
     return generate_latest(REGISTRY), 200, {"Content-Type": CONTENT_TYPE_LATEST}
 
 
