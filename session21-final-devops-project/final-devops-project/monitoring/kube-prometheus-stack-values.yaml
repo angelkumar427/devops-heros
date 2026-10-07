@@ -1,0 +1,35 @@
+# kube-prometheus-stack values for a single-node k3s demo cluster.
+
+# k3s runs the controller-manager, scheduler, proxy and etcd inside ONE binary and
+# doesn't expose the metrics endpoints the chart scrapes. Left enabled they show as
+# permanently DOWN and fire false alerts (KubeSchedulerDown, KubeControllerManagerDown...).
+kubeControllerManager: { enabled: false }
+kubeScheduler: { enabled: false }
+kubeProxy: { enabled: false }
+kubeEtcd: { enabled: false }
+
+prometheus:
+  prometheusSpec:
+    retention: 2d
+    scrapeInterval: 15s
+    # Pick up ServiceMonitors / PrometheusRules from ANY namespace, not only the
+    # ones labelled with this release - otherwise our app's monitors are ignored.
+    serviceMonitorSelectorNilUsesHelmValues: false
+    ruleSelectorNilUsesHelmValues: false
+    resources:
+      requests: { cpu: 200m, memory: 400Mi }
+
+alertmanager:
+  alertmanagerSpec:
+    resources:
+      requests: { cpu: 50m, memory: 64Mi }
+
+grafana:
+  # Local demo only: anonymous READ-ONLY access so dashboards can be viewed without
+  # a login. Never do this on a cluster reachable from a network.
+  grafana.ini:
+    auth.anonymous:
+      enabled: true
+      org_role: Viewer
+  resources:
+    requests: { cpu: 50m, memory: 128Mi }

@@ -1,0 +1,14 @@
+# Secret scanning - Gitleaks configuration.
+# Extends the default ruleset with two narrow, documented exceptions.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Documented demo values and non-secret hashes"
+regexTarget = "line"
+regexes = [
+  # The chart's demo token - overridden in prod via values-prod.yaml (existingSecret).
+  '''demo-token-change-me''',
+  # Helm checksum annotations are SHA-256 hashes used to roll pods, not credentials.
+  '''checksum/(config|secret): [0-9a-f]{64}''',
+]

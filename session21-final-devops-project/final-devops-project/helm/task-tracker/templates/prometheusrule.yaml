@@ -1,0 +1,32 @@
+{{- if .Values.monitoring.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ include "tt.name" . }}
+  labels: {{- include "tt.labels" . | nindent 4 }}
+spec:
+  groups:
+    - name: task-tracker.rules
+      rules:
+        - alert: TaskTrackerDown
+          expr: absent(up{job="{{ include "tt.name" . }}", namespace="{{ .Release.Namespace }}"} == 1)
+          for: 30s
+          labels: { severity: critical }
+          annotations:
+            summary: "Task Tracker is down"
+        - alert: TaskTrackerHighErrorRate
+          expr: |
+            sum(rate(tasks_http_requests_total{namespace="{{ .Release.Namespace }}", status=~"5.."}[2m]))
+              / clamp_min(sum(rate(tasks_http_requests_total{namespace="{{ .Release.Namespace }}"}[2m])), 1e-9) > 0.05
+          for: 1m
+          labels: { severity: warning }
+          annotations:
+            summary: "More than 5% of Task Tracker requests are failing"
+        # pod label, not container: on this cluster cAdvisor emits no `container` label
+        - alert: TaskTrackerHighCPU
+          expr: sum(rate(container_cpu_usage_seconds_total{namespace="{{ .Release.Namespace }}", pod=~"{{ include "tt.name" . }}-.*"}[2m])) > 0.4
+          for: 1m
+          labels: { severity: warning }
+          annotations:
+            summary: "Task Tracker CPU usage is high"
+{{- end }}

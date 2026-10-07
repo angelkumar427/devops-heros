@@ -1,0 +1,22 @@
+# Argo CD deploys the Helm chart in this repository. Git is the source of truth:
+# change helm/task-tracker or these parameters, push, and the cluster follows.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: task-tracker
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/angelkumar427/devops-heros.git
+    targetRevision: main
+    path: session21-final-devops-project/final-devops-project/helm/task-tracker
+    helm:
+      releaseName: task-tracker
+      valueFiles: [values.yaml]
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: task-tracker
+  syncPolicy:
+    automated: { prune: true, selfHeal: true }
+    syncOptions: [CreateNamespace=true]

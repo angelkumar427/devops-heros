@@ -1,0 +1,15 @@
+replicaCount: 3
+config:
+  APP_ENV: "prod"
+  LOG_LEVEL: "WARNING"
+  MAX_TASKS: "1000"
+secret:
+  existingSecret: "task-tracker-api-token"   # created out-of-band, never in Git
+persistence:
+  size: 2Gi
+autoscaling:
+  minReplicas: 3
+  maxReplicas: 10
+resources:
+  requests: { cpu: 100m, memory: 128Mi }
+  limits:   { cpu: 500m, memory: 256Mi }

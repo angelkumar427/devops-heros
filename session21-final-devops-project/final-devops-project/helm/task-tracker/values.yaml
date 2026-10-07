@@ -1,0 +1,52 @@
+replicaCount: 2
+
+image:
+  repository: task-tracker
+  tag: "1.1.0"
+  pullPolicy: IfNotPresent
+
+# ConfigMap - non-sensitive settings
+config:
+  APP_ENV: "dev"
+  LOG_LEVEL: "INFO"
+  MAX_TASKS: "100"
+
+# Secret - the API token required for writes.
+# DEMO VALUE ONLY. A real deployment sets secret.existingSecret to a Secret managed by
+# Sealed Secrets / External Secrets, so no credential is ever committed to Git.
+secret:
+  existingSecret: ""
+  apiToken: "demo-token-change-me"
+
+persistence:
+  enabled: true
+  size: 256Mi
+  storageClassName: ""        # "" = use the cluster default (local-path on k3s)
+  accessMode: ReadWriteOnce
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8080
+
+ingress:
+  enabled: true
+  className: nginx
+  host: task-tracker.local
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 60
+
+resources:
+  requests: { cpu: 50m, memory: 64Mi }
+  limits:   { cpu: 300m, memory: 192Mi }
+
+monitoring:
+  enabled: true
+
+probes:
+  liveness:  { path: /healthz, initialDelaySeconds: 5, periodSeconds: 10 }
+  readiness: { path: /readyz,  initialDelaySeconds: 3, periodSeconds: 5 }

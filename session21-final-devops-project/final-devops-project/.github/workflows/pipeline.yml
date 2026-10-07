@@ -1,0 +1,156 @@
+# COPY for reference. GitHub only runs workflows from the repository root, so the live
+# version is .github/workflows/session21-final-project.yml at the top of this repo.
+
+# Session 21 - Final DevOps project pipeline
+#   Build -> Test -> SAST -> SCA -> Secret scan -> Docker build -> Image scan
+#         -> SECURITY GATE -> Push to GHCR -> Helm deploy to Kubernetes -> Verify
+name: Session 21 - Final Project Pipeline
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "session21-final-devops-project/**"
+      - ".github/workflows/session21-final-project.yml"
+  pull_request:
+    paths: ["session21-final-devops-project/**"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  P: session21-final-devops-project/final-devops-project
+  IMAGE_NAME: session21-task-tracker
+
+jobs:
+  build-test:
+    name: Build & unit test
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: "${{ env.P }}/application" } }
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with: { python-version: "3.12" }
+      - run: pip install -r requirements-dev.txt
+      - run: python -m pytest -v --cov=app --cov-report=term --junitxml=test-results.xml
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with: { name: test-results, path: "${{ env.P }}/application/test-results.xml" }
+
+  sast:
+    name: SAST (Bandit)
+    needs: build-test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with: { python-version: "3.12" }
+      - run: pip install bandit
+      - run: bandit -c "$P/security/bandit.yaml" -r "$P/application/app" -ll
+
+  sca:
+    name: SCA (pip-audit)
+    needs: build-test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with: { python-version: "3.12" }
+      - run: pip install pip-audit
+      - run: pip-audit -r "$P/application/requirements.txt"
+
+  secret-scan:
+    name: Secret scan (Gitleaks)
+    needs: build-test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - run: |
+          docker run --rm -v "$PWD/$P:/src" zricethezav/gitleaks:latest \
+            dir /src --no-banner --redact --config /src/security/.gitleaks.toml
+
+  image-scan:
+    name: Docker build & image scan (Trivy)
+    needs: build-test
+    runs-on: ubuntu-latest
+    outputs:
+      image: ${{ steps.meta.outputs.image }}
+    steps:
+      - uses: actions/checkout@v7
+      - id: meta
+        run: echo "image=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/${IMAGE_NAME}:${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+      - name: Docker build
+        run: docker build -f "$P/docker/Dockerfile" --build-arg APP_VERSION=${GITHUB_SHA::7} -t "${{ steps.meta.outputs.image }}" "$P/application"
+      - name: Image scan
+        run: |
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$PWD/$P/security:/cfg" \
+            aquasec/trivy:latest image --config /cfg/trivy.yaml "${{ steps.meta.outputs.image }}"
+      - run: docker save "${{ steps.meta.outputs.image }}" -o image.tar
+      - uses: actions/upload-artifact@v7
+        with: { name: scanned-image, path: image.tar, retention-days: 1 }
+
+  security-gate:
+    name: Security gate
+    needs: [sast, sca, secret-scan, image-scan]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          FAILED=0
+          for pair in "SAST:${{ needs.sast.result }}" "SCA:${{ needs.sca.result }}" \
+                      "Secret scan:${{ needs.secret-scan.result }}" "Image scan:${{ needs.image-scan.result }}"; do
+            printf '%-12s %s\n' "${pair%%:*}" "${pair##*:}"
+            echo "| ${pair%%:*} | ${pair##*:} |" >> "$GITHUB_STEP_SUMMARY"
+            [ "${pair##*:}" = "success" ] || FAILED=1
+          done
+          [ "$FAILED" = 0 ] && echo "SECURITY GATE: PASSED" || { echo "SECURITY GATE: FAILED"; exit 1; }
+
+  push-image:
+    name: Push image
+    needs: [security-gate, image-scan]
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v8
+        with: { name: scanned-image }
+      - run: docker load -i image.tar
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - run: docker push "${{ needs.image-scan.outputs.image }}"
+
+  deploy:
+    name: Helm deploy to Kubernetes
+    needs: [push-image, image-scan]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: helm/kind-action@v1
+        with: { cluster_name: final }
+      - name: Load the gated image
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          docker pull "${{ needs.image-scan.outputs.image }}"
+          kind load docker-image "${{ needs.image-scan.outputs.image }}" --name final
+      - name: helm upgrade --install
+        run: |
+          IMG="${{ needs.image-scan.outputs.image }}"
+          helm upgrade --install task-tracker "$P/helm/task-tracker" \
+            --namespace task-tracker --create-namespace \
+            --set image.repository="${IMG%:*}" --set image.tag="${IMG##*:}" \
+            --set ingress.enabled=false --set monitoring.enabled=false \
+            --wait --timeout 3m
+          helm list -n task-tracker
+          kubectl get deploy,pods,svc,pvc,hpa,cm,secret -n task-tracker
+      - name: Verify the deployment
+        run: |
+          kubectl port-forward -n task-tracker svc/task-tracker 8080:80 >/dev/null 2>&1 &
+          sleep 3
+          curl -fs localhost:8080/readyz; echo
+          curl -fs -X POST -H "Authorization: Bearer demo-token-change-me" -H "Content-Type: application/json" \
+            -d '{"title":"deployed by the pipeline"}' localhost:8080/api/tasks; echo
+          curl -fs localhost:8080/api/tasks; echo

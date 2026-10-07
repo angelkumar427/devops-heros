@@ -1,0 +1,256 @@
+# Rendered from the Helm chart - plain manifests for kubectl users:
+#   helm template task-tracker ../helm/task-tracker --namespace task-tracker > task-tracker.yaml
+---
+# Source: task-tracker/templates/secret.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: task-tracker-secret
+  labels:
+    app.kubernetes.io/name: task-tracker
+    app.kubernetes.io/instance: task-tracker
+    app.kubernetes.io/version: "1.1.0"
+    app.kubernetes.io/managed-by: Helm
+type: Opaque
+stringData:
+  API_TOKEN: "demo-token-change-me"
+
+---
+# Source: task-tracker/templates/configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: task-tracker-config
+  labels:
+    app.kubernetes.io/name: task-tracker
+    app.kubernetes.io/instance: task-tracker
+    app.kubernetes.io/version: "1.1.0"
+    app.kubernetes.io/managed-by: Helm
+data:
+  APP_ENV: "dev"
+  LOG_LEVEL: "INFO"
+  MAX_TASKS: "100"
+
+---
+# Source: task-tracker/templates/pvc.yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: task-tracker-data
+  labels:
+    app.kubernetes.io/name: task-tracker
+    app.kubernetes.io/instance: task-tracker
+    app.kubernetes.io/version: "1.1.0"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 256Mi
+
+---
+# Source: task-tracker/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: task-tracker
+  labels:
+    app.kubernetes.io/name: task-tracker
+    app.kubernetes.io/instance: task-tracker
+    app.kubernetes.io/version: "1.1.0"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: task-tracker
+    app.kubernetes.io/instance: task-tracker
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+
+---
+# Source: task-tracker/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: task-tracker
+  labels:
+    app.kubernetes.io/name: task-tracker
+    app.kubernetes.io/instance: task-tracker
+    app.kubernetes.io/version: "1.1.0"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: task-tracker
+      app.kubernetes.io/instance: task-tracker
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: task-tracker
+        app.kubernetes.io/instance: task-tracker
+      annotations:
+        # Roll the pods whenever config or secret changes - env vars are fixed at
+        # container start, so without this a config change would never take effect.
+        checksum/config: 81819c838ae04e7e6424bbac88fa4367ff07f3341855a2b9efbbe74dd1040408
+        checksum/secret: 79641a88c47c21ed35d74371cc203fa90e675496df3e334bb805c2c93c1753eb
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        fsGroup: 10001
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: task-tracker
+          image: "task-tracker:1.1.0"
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: task-tracker-config
+          env:
+            - name: API_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: task-tracker-secret
+                  key: API_TOKEN
+          livenessProbe:
+            httpGet: { path: /healthz, port: http }
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            httpGet: { path: /readyz, port: http }
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          resources:
+            limits:
+              cpu: 300m
+              memory: 192Mi
+            requests:
+              cpu: 50m
+              memory: 64Mi
+          volumeMounts:
+            - { name: data, mountPath: /data }
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: task-tracker-data
+        - name: tmp
+          emptyDir: {}
+
+---
+# Source: task-tracker/templates/hpa.yaml
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: task-tracker
+  labels:
+    app.kubernetes.io/name: task-tracker
+    app.kubernetes.io/instance: task-tracker
+    app.kubernetes.io/version: "1.1.0"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: task-tracker
+  minReplicas: 2
+  maxReplicas: 5
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 60
+
+---
+# Source: task-tracker/templates/ingress.yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: task-tracker
+  labels:
+    app.kubernetes.io/name: task-tracker
+    app.kubernetes.io/instance: task-tracker
+    app.kubernetes.io/version: "1.1.0"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: task-tracker.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: task-tracker
+                port:
+                  name: http
+
+---
+# Source: task-tracker/templates/prometheusrule.yaml
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: task-tracker
+  labels:
+    app.kubernetes.io/name: task-tracker
+    app.kubernetes.io/instance: task-tracker
+    app.kubernetes.io/version: "1.1.0"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  groups:
+    - name: task-tracker.rules
+      rules:
+        - alert: TaskTrackerDown
+          expr: absent(up{job="task-tracker", namespace="task-tracker"} == 1)
+          for: 30s
+          labels: { severity: critical }
+          annotations:
+            summary: "Task Tracker is down"
+        - alert: TaskTrackerHighErrorRate
+          expr: |
+            sum(rate(tasks_http_requests_total{namespace="task-tracker", status=~"5.."}[2m]))
+              / clamp_min(sum(rate(tasks_http_requests_total{namespace="task-tracker"}[2m])), 1e-9) > 0.05
+          for: 1m
+          labels: { severity: warning }
+          annotations:
+            summary: "More than 5% of Task Tracker requests are failing"
+        # pod label, not container: on this cluster cAdvisor emits no `container` label
+        - alert: TaskTrackerHighCPU
+          expr: sum(rate(container_cpu_usage_seconds_total{namespace="task-tracker", pod=~"task-tracker-.*"}[2m])) > 0.4
+          for: 1m
+          labels: { severity: warning }
+          annotations:
+            summary: "Task Tracker CPU usage is high"
+
+---
+# Source: task-tracker/templates/servicemonitor.yaml
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: task-tracker
+  labels:
+    app.kubernetes.io/name: task-tracker
+    app.kubernetes.io/instance: task-tracker
+    app.kubernetes.io/version: "1.1.0"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: task-tracker
+      app.kubernetes.io/instance: task-tracker
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 15s

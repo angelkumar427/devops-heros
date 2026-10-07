@@ -1,0 +1,3 @@
+Task Tracker {{ .Values.image.tag }} deployed as release "{{ .Release.Name }}" in "{{ .Release.Namespace }}".
+  Ingress:  http://{{ .Values.ingress.host }}/
+  Health:   kubectl -n {{ .Release.Namespace }} get pods -l app.kubernetes.io/instance={{ .Release.Name }}

@@ -1,0 +1,7 @@
+# Container image scanning - Trivy configuration.
+# (Key placement matters: Trivy silently ignores unknown keys, and ignore-unfixed
+#  lives under "vulnerability:" - at the top level it has no effect.)
+severity: [HIGH, CRITICAL]
+exit-code: 1              # non-zero exit = the security gate fails
+vulnerability:
+  ignore-unfixed: true    # only fail on findings that actually have a fix available

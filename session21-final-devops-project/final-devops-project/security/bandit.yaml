@@ -1,0 +1,3 @@
+# SAST - Bandit configuration.
+# Severity gate is applied on the command line (-ll = fail on MEDIUM and above).
+exclude_dirs: ["tests"]
