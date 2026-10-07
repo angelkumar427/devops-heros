@@ -5,7 +5,7 @@ metadata:
   name: gitops-demo
   labels: { app: gitops-demo }
 spec:
-  replicas: 2
+  replicas: 3
   selector:
     matchLabels: { app: gitops-demo }
   template:
@@ -17,7 +17,7 @@ spec:
           image: ghcr.io/stefanprodan/podinfo:6.7.1
           env:
             - name: PODINFO_UI_MESSAGE
-              value: "Deployed by Argo CD from Git - version 1"
+              value: "Deployed by Argo CD from Git - version 2"
           ports:
             - { name: http, containerPort: 9898 }
           readinessProbe:
