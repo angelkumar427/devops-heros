@@ -12,7 +12,7 @@ metadata:
   labels:
     app.kubernetes.io/name: task-tracker
     app.kubernetes.io/instance: task-tracker
-    app.kubernetes.io/version: "1.2.0"
+    app.kubernetes.io/version: "1.2.1"
     app.kubernetes.io/managed-by: Helm
 spec:
   minAvailable: 1
@@ -30,7 +30,7 @@ metadata:
   labels:
     app.kubernetes.io/name: task-tracker
     app.kubernetes.io/instance: task-tracker
-    app.kubernetes.io/version: "1.2.0"
+    app.kubernetes.io/version: "1.2.1"
     app.kubernetes.io/managed-by: Helm
 type: Opaque
 stringData:
@@ -45,7 +45,7 @@ metadata:
   labels:
     app.kubernetes.io/name: task-tracker
     app.kubernetes.io/instance: task-tracker
-    app.kubernetes.io/version: "1.2.0"
+    app.kubernetes.io/version: "1.2.1"
     app.kubernetes.io/managed-by: Helm
 data:
   APP_ENV: "dev"
@@ -63,7 +63,7 @@ metadata:
   labels:
     app.kubernetes.io/name: task-tracker
     app.kubernetes.io/instance: task-tracker
-    app.kubernetes.io/version: "1.2.0"
+    app.kubernetes.io/version: "1.2.1"
     app.kubernetes.io/managed-by: Helm
     grafana_dashboard: "1"
 data:
@@ -259,7 +259,7 @@ data:
                 "type": "prometheus",
                 "uid": "prometheus"
               },
-              "expr": "sum(rate(tasks_http_requests_total{namespace=\"$namespace\", status=~\"5..\"}[2m])) / clamp_min(sum(rate(tasks_http_requests_total{namespace=\"$namespace\"}[2m])), 1e-9)"
+              "expr": "(sum(rate(tasks_http_requests_total{namespace=\"$namespace\", status=~\"5..\"}[2m])) or vector(0)) / clamp_min(sum(rate(tasks_http_requests_total{namespace=\"$namespace\"}[2m])), 1e-9)"
             }
           ]
         },
@@ -547,7 +547,7 @@ data:
                 "type": "prometheus",
                 "uid": "prometheus"
               },
-              "expr": "sum by (pod) (container_memory_working_set_bytes{namespace=\"$namespace\", pod=~\"task-tracker-.*\", image!=\"\"})",
+              "expr": "sum by (pod) (container_memory_working_set_bytes{namespace=\"$namespace\", pod=~\"task-tracker-.*\"})",
               "legendFormat": "{{pod}}"
             }
           ]
@@ -565,7 +565,7 @@ metadata:
   labels:
     app.kubernetes.io/name: task-tracker
     app.kubernetes.io/instance: task-tracker
-    app.kubernetes.io/version: "1.2.0"
+    app.kubernetes.io/version: "1.2.1"
     app.kubernetes.io/managed-by: Helm
 spec:
   accessModes: [ReadWriteOnce]
@@ -582,7 +582,7 @@ metadata:
   labels:
     app.kubernetes.io/name: task-tracker
     app.kubernetes.io/instance: task-tracker
-    app.kubernetes.io/version: "1.2.0"
+    app.kubernetes.io/version: "1.2.1"
     app.kubernetes.io/managed-by: Helm
 spec:
   type: ClusterIP
@@ -603,7 +603,7 @@ metadata:
   labels:
     app.kubernetes.io/name: task-tracker
     app.kubernetes.io/instance: task-tracker
-    app.kubernetes.io/version: "1.2.0"
+    app.kubernetes.io/version: "1.2.1"
     app.kubernetes.io/managed-by: Helm
 spec:
   selector:
@@ -618,8 +618,8 @@ spec:
       annotations:
         # Roll the pods whenever config or secret changes - env vars are fixed at
         # container start, so without this a config change would never take effect.
-        checksum/config: fe73a31261c471cf06f8f38cc69d90d0d5b8f57d9a9af6988022620a537246d4
-        checksum/secret: 3d5539cb20c4bf7f0fc801c3b762728b9d61a7d3e9270b04f8515842b06a6db7
+        checksum/config: 1f783e022a029e7acebaca02f1bc893eede3e24f3b70c8aad5c6f80a722be5a2
+        checksum/secret: cde6364d3740299864affdf96ab1e9a7abdeb00eb2cf7ede4a3cfcf5d5519a2e
     spec:
       securityContext:
         runAsNonRoot: true
@@ -628,7 +628,7 @@ spec:
         seccompProfile: { type: RuntimeDefault }
       containers:
         - name: task-tracker
-          image: "task-tracker:1.2.0"
+          image: "task-tracker:1.2.1"
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
@@ -680,7 +680,7 @@ metadata:
   labels:
     app.kubernetes.io/name: task-tracker
     app.kubernetes.io/instance: task-tracker
-    app.kubernetes.io/version: "1.2.0"
+    app.kubernetes.io/version: "1.2.1"
     app.kubernetes.io/managed-by: Helm
 spec:
   scaleTargetRef:
@@ -706,7 +706,7 @@ metadata:
   labels:
     app.kubernetes.io/name: task-tracker
     app.kubernetes.io/instance: task-tracker
-    app.kubernetes.io/version: "1.2.0"
+    app.kubernetes.io/version: "1.2.1"
     app.kubernetes.io/managed-by: Helm
 spec:
   ingressClassName: nginx
@@ -731,7 +731,7 @@ metadata:
   labels:
     app.kubernetes.io/name: task-tracker
     app.kubernetes.io/instance: task-tracker
-    app.kubernetes.io/version: "1.2.0"
+    app.kubernetes.io/version: "1.2.1"
     app.kubernetes.io/managed-by: Helm
 spec:
   groups:
@@ -768,7 +768,7 @@ metadata:
   labels:
     app.kubernetes.io/name: task-tracker
     app.kubernetes.io/instance: task-tracker
-    app.kubernetes.io/version: "1.2.0"
+    app.kubernetes.io/version: "1.2.1"
     app.kubernetes.io/managed-by: Helm
 spec:
   selector:

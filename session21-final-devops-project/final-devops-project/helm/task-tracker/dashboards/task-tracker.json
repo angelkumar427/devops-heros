@@ -189,7 +189,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(rate(tasks_http_requests_total{namespace=\"$namespace\", status=~\"5..\"}[2m])) / clamp_min(sum(rate(tasks_http_requests_total{namespace=\"$namespace\"}[2m])), 1e-9)"
+          "expr": "(sum(rate(tasks_http_requests_total{namespace=\"$namespace\", status=~\"5..\"}[2m])) or vector(0)) / clamp_min(sum(rate(tasks_http_requests_total{namespace=\"$namespace\"}[2m])), 1e-9)"
         }
       ]
     },
@@ -477,7 +477,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum by (pod) (container_memory_working_set_bytes{namespace=\"$namespace\", pod=~\"task-tracker-.*\", image!=\"\"})",
+          "expr": "sum by (pod) (container_memory_working_set_bytes{namespace=\"$namespace\", pod=~\"task-tracker-.*\"})",
           "legendFormat": "{{pod}}"
         }
       ]

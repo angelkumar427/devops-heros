@@ -67,6 +67,7 @@ def test_metrics_exposed(client):
     body = client.get("/metrics").get_data(as_text=True)
     assert 'tasks_http_requests_total{method="GET",path="/healthz",status="200"} 1.0' in body
     assert 'endpoint="' not in body  # would collide with Prometheus Operator's target label
+    assert 'le="0.001"' in body  # sub-5ms buckets, so p95 is measured rather than interpolated
 
 
 def test_tasks_stored_gauge_reflects_disk_after_restart(tmp_path, monkeypatch):

@@ -38,7 +38,10 @@ REGISTRY = CollectorRegistry()
 # The route label is "path", not "endpoint": Prometheus Operator attaches its own `endpoint`
 # target label (the Service port name) and would silently rename ours to exported_endpoint.
 REQUESTS = Counter("tasks_http_requests_total", "HTTP requests", ["method", "path", "status"], registry=REGISTRY)
-LATENCY = Histogram("tasks_http_request_duration_seconds", "Request latency", ["path"], registry=REGISTRY)
+# Buckets start at 0.5 ms: this API answers in ~1-3 ms, and with the default buckets (first
+# one 5 ms) every request lands in one bucket, so p95 is just interpolated (a flat 4.75 ms).
+LATENCY = Histogram("tasks_http_request_duration_seconds", "Request latency", ["path"], registry=REGISTRY,
+                    buckets=(0.0005, 0.001, 0.0025, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0))
 TASKS = Gauge("tasks_stored", "Number of tasks currently stored", registry=REGISTRY)
 
 

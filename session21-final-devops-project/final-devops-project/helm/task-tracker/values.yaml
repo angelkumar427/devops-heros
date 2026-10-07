@@ -2,7 +2,7 @@ replicaCount: 2
 
 image:
   repository: task-tracker
-  tag: "1.2.0"
+  tag: "1.2.1"
   pullPolicy: IfNotPresent
 
 # ConfigMap - non-sensitive settings
