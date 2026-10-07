@@ -1,0 +1,38 @@
+# Troubleshooting challenge - a deliberately BROKEN set of values for the task-tracker chart.
+# It contains several independent faults. Install it into a scratch namespace and work out
+# what is wrong from the cluster's own signals (events, describe, logs, endpoints).
+#   helm install task-tracker-lab ../helm/task-tracker -n tt-lab --create-namespace -f broken-values.yaml
+# The walk-through (symptom -> investigation -> root cause -> fix -> verify) is in ../README.md.
+replicaCount: 2
+
+image:
+  repository: task-tracker
+  tag: "1.3.0"
+  pullPolicy: IfNotPresent
+
+secret:
+  existingSecret: task-tracker-lab-token
+
+persistence:
+  enabled: true
+  size: 256Mi
+  storageClassName: fast-ssd
+
+service:
+  port: 80
+  targetPort: 8000
+
+ingress:
+  enabled: true
+  className: nginx-internal
+  host: lab.task-tracker.local
+
+autoscaling:
+  enabled: false
+
+resources:
+  requests: { cpu: 50m, memory: 16Mi }
+  limits:   { cpu: 300m, memory: 24Mi }
+
+monitoring:
+  enabled: false

@@ -1,0 +1,14 @@
+{{- if .Values.monitoring.enabled }}
+# The app ships its own dashboard. Grafana's sidecar (kube-prometheus-stack) loads every
+# ConfigMap labelled grafana_dashboard=1, so this deploys through GitOps with the app.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "tt.name" . }}-dashboard
+  labels:
+    {{- include "tt.labels" . | nindent 4 }}
+    grafana_dashboard: "1"
+data:
+  task-tracker.json: |-
+{{ .Files.Get "dashboards/task-tracker.json" | indent 4 }}
+{{- end }}
