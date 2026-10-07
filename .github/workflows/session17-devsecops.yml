@@ -1,0 +1,193 @@
+# Session 17 - CI/CD + DevSecOps pipeline
+# Project: session-17-devsecops/HW/devsecops-demo
+#
+# Code -> Build -> Unit Test -> SAST -> SCA -> Secret Scan -> Docker Build
+#      -> Container Image Scan -> SECURITY GATE -> Push Image -> Deploy to Kubernetes
+name: Session 17 - DevSecOps Pipeline
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "session-17-devsecops/**"
+      - ".github/workflows/session17-devsecops.yml"
+  pull_request:
+    paths:
+      - "session-17-devsecops/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  PROJECT_DIR: session-17-devsecops/HW/devsecops-demo
+  IMAGE_NAME: session17-notes-api
+
+jobs:
+  # ── 1-2. Build + Unit Test ─────────────────────────────────────────
+  build-test:
+    name: Build & unit test
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: "${{ env.PROJECT_DIR }}" } }
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with: { python-version: "3.12" }
+      - name: Build (install dependencies)
+        run: pip install -r requirements-dev.txt
+      - name: Unit tests
+        run: python -m pytest -v --cov=app --cov-report=term --junitxml=test-results.xml
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with: { name: test-results, path: "${{ env.PROJECT_DIR }}/test-results.xml" }
+
+  # ── 3. SAST ────────────────────────────────────────────────────────
+  sast:
+    name: SAST (Bandit)
+    needs: build-test
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: "${{ env.PROJECT_DIR }}" } }
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with: { python-version: "3.12" }
+      - run: pip install bandit
+      - name: Static analysis of the source code
+        run: |
+          bandit -r app -f json -o bandit-report.json || true
+          bandit -r app -ll          # fail on MEDIUM or HIGH severity
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with: { name: sast-bandit-report, path: "${{ env.PROJECT_DIR }}/bandit-report.json" }
+
+  # ── 4. SCA ─────────────────────────────────────────────────────────
+  sca:
+    name: SCA (pip-audit)
+    needs: build-test
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: "${{ env.PROJECT_DIR }}" } }
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with: { python-version: "3.12" }
+      - run: pip install pip-audit
+      - name: Scan dependencies for known vulnerabilities
+        run: |
+          pip-audit -r requirements.txt -f json -o sca-report.json || true
+          pip-audit -r requirements.txt   # fails if any known vulnerability is found
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with: { name: sca-pip-audit-report, path: "${{ env.PROJECT_DIR }}/sca-report.json" }
+
+  # ── 5. Secret scanning ─────────────────────────────────────────────
+  secret-scan:
+    name: Secret scan (Gitleaks)
+    needs: build-test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Scan for committed secrets
+        run: |
+          docker run --rm -v "$PWD/${PROJECT_DIR}:/src" zricethezav/gitleaks:latest \
+            dir /src --no-banner --redact --report-format json --report-path /src/gitleaks-report.json
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with: { name: secret-scan-report, path: "${{ env.PROJECT_DIR }}/gitleaks-report.json" }
+
+  # ── 6-7. Docker build + container image scan ───────────────────────
+  image-scan:
+    name: Docker build & image scan (Trivy)
+    needs: build-test
+    runs-on: ubuntu-latest
+    outputs:
+      image: ${{ steps.meta.outputs.image }}
+    steps:
+      - uses: actions/checkout@v7
+      - id: meta
+        run: echo "image=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/${IMAGE_NAME}:${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+      - name: Docker build
+        run: docker build --build-arg APP_VERSION=${GITHUB_SHA::7} -t "${{ steps.meta.outputs.image }}" "${PROJECT_DIR}"
+      - name: Scan image (fail on fixable HIGH/CRITICAL)
+        run: |
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:latest \
+            image --severity HIGH,CRITICAL --ignore-unfixed --format table \
+            --exit-code 1 "${{ steps.meta.outputs.image }}"
+      - name: Save image for the push stage (build once, push the scanned image)
+        run: docker save "${{ steps.meta.outputs.image }}" -o image.tar
+      - uses: actions/upload-artifact@v7
+        with: { name: scanned-image, path: image.tar, retention-days: 1 }
+
+  # ── 8. SECURITY GATE ───────────────────────────────────────────────
+  security-gate:
+    name: Security gate
+    needs: [sast, sca, secret-scan, image-scan]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Evaluate every security check
+        run: |
+          echo "| Check | Result |"            >> "$GITHUB_STEP_SUMMARY"
+          echo "|---|---|"                     >> "$GITHUB_STEP_SUMMARY"
+          FAILED=0
+          for pair in "SAST:${{ needs.sast.result }}" \
+                      "SCA:${{ needs.sca.result }}" \
+                      "Secret scan:${{ needs.secret-scan.result }}" \
+                      "Image scan:${{ needs.image-scan.result }}"; do
+            name="${pair%%:*}"; result="${pair##*:}"
+            printf '%-14s %s\n' "$name" "$result"
+            echo "| $name | $result |" >> "$GITHUB_STEP_SUMMARY"
+            [ "$result" = "success" ] || FAILED=1
+          done
+          if [ "$FAILED" = 1 ]; then
+            echo "SECURITY GATE: FAILED - image will NOT be pushed or deployed"
+            echo "**Security gate: FAILED** - push and deploy blocked" >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+          echo "SECURITY GATE: PASSED"
+          echo "**Security gate: PASSED**" >> "$GITHUB_STEP_SUMMARY"
+
+  # ── 9. Push image ──────────────────────────────────────────────────
+  push-image:
+    name: Push image
+    needs: [security-gate, image-scan]
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v8
+        with: { name: scanned-image }
+      - run: docker load -i image.tar
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - run: docker push "${{ needs.image-scan.outputs.image }}"
+
+  # ── 10. Deploy to Kubernetes ───────────────────────────────────────
+  deploy:
+    name: Deploy to Kubernetes
+    needs: [push-image, image-scan]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: helm/kind-action@v1
+        with: { cluster_name: devsecops }
+      - name: Pull the gated image and load it into the cluster
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          docker pull "${{ needs.image-scan.outputs.image }}"
+          kind load docker-image "${{ needs.image-scan.outputs.image }}" --name devsecops
+      - name: Deploy
+        run: |
+          sed "s|IMAGE_PLACEHOLDER|${{ needs.image-scan.outputs.image }}|" \
+            "${PROJECT_DIR}/k8s/deployment.yaml" | kubectl apply -f -
+          kubectl rollout status deployment/notes-api --timeout=120s
+          kubectl get deploy,pods,svc -l app=notes-api -o wide
+      - name: Verify
+        run: |
+          kubectl port-forward svc/notes-api 8080:80 >/dev/null 2>&1 &
+          sleep 3
+          curl -fs localhost:8080/health; echo
+          curl -fs -X POST -H 'Content-Type: application/json' -d '{"text":"shipped through the gate"}' localhost:8080/notes; echo
+          curl -fs localhost:8080/notes; echo
