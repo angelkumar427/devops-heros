@@ -1,0 +1,30 @@
+### 1. IDENTIFY
+$ kubectl get pod creating-demo -o wide
+NAME            READY   STATUS              RESTARTS   AGE   IP       NODE     NOMINATED NODE   READINESS GATES
+creating-demo   0/1     ContainerCreating   0          20s   <none>   colima   <none>           <none>
+#   Scheduled (NODE=colima) but stuck - the container never starts.
+
+### 2. INVESTIGATE
+$ kubectl describe pod creating-demo | grep FailedMount
+  Warning  FailedMount  5s (x6 over 20s)  kubelet            MountVolume.SetUp failed for volume "tls" : secret "app-tls-cert" not found
+$ kubectl get secret app-tls-cert
+Error from server (NotFound): secrets "app-tls-cert" not found
+
+### 3. ROOT CAUSE
+#   The pod mounts Secret "app-tls-cert", which does not exist. kubelet cannot
+#   prepare the volume, so it never creates the container. No crash, no logs -
+#   kubectl logs is useless here; only describe/events show the reason.
+
+### 4. FIX - create the missing Secret (no pod change needed)
+$ kubectl apply -f fix-secret.yaml
+secret/app-tls-cert created
+
+### 5. VERIFY
+$ kubectl get pod creating-demo
+NAME            READY   STATUS    RESTARTS   AGE
+creating-demo   1/1     Running   0          32s
+$ kubectl exec creating-demo -- ls /etc/tls
+tls.crt
+tls.key
+#   kubelet retried the mount on its own and the SAME pod started - it was
+#   never broken, only waiting for a dependency.

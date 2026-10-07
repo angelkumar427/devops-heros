@@ -1,0 +1,41 @@
+# baseline: both pods can reach the web service
+  client   -> <title>Welcome to nginx!</title>
+  intruder -> <title>Welcome to nginx!</title>
+
+$ kubectl apply -f deny-all.yaml
+networkpolicy.networking.k8s.io/web-deny-all created
+
+### 1. IDENTIFY
+  client   -> wget: can't connect to remote host (10.43.154.252): Connection refused
+  intruder -> wget: can't connect to remote host (10.43.154.252): Connection refused
+#   Both REFUSED. Pods Running, Service has endpoints, DNS resolves - yet no traffic.
+#   (k3s kube-router REJECTs blocked packets, so this is an instant refusal. CNIs that
+#   silently DROP instead, like Calico, would show a TIMEOUT for the same problem.)
+
+### 2. INVESTIGATE
+$ kubectl get endpoints broken-service
+   broken-service 10.42.0.92:80,10.42.0.93:80
+$ kubectl get networkpolicy
+NAME           POD-SELECTOR   AGE
+web-deny-all   app=web        9s
+$ kubectl describe networkpolicy web-deny-all | sed -n "/Spec/,/Policy Types/p"
+Spec:
+  PodSelector:     app=web
+  Allowing ingress traffic:
+    <none> (Selected pods are isolated for ingress connectivity)
+  Not affecting egress traffic
+  Policy Types: Ingress
+
+### 3. ROOT CAUSE
+#   A NetworkPolicy selects app=web and lists NO ingress rules. Once any policy
+#   selects a pod, all ingress not explicitly allowed is DROPPED. Every layer
+#   above the network looks healthy - which is what makes this hard to spot.
+
+### 4. FIX - allow only what should be allowed
+$ kubectl apply -f allow-from-client.yaml   # from role=client, TCP 80
+networkpolicy.networking.k8s.io/web-allow-client created
+
+### 5. VERIFY
+  client   -> <title>Welcome to nginx!</title>
+  intruder -> wget: can't connect to remote host (10.43.154.252): Connection refused
+#   Policies are additive: deny-all plus one allow rule = exactly the intended access.

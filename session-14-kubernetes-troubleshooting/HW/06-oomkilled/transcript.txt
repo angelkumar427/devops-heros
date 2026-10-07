@@ -1,0 +1,46 @@
+### 1. IDENTIFY
+$ kubectl get pod fail-5-oomkilled-pod -o wide
+NAME                   READY   STATUS      RESTARTS      AGE   IP           NODE     NOMINATED NODE   READINESS GATES
+fail-5-oomkilled-pod   0/1     OOMKilled   2 (29s ago)   30s   10.42.0.99   colima   <none>           <none>
+
+### 2. INVESTIGATE
+$ kubectl describe pod fail-5-oomkilled-pod | grep -A3 "Last State"
+    Last State:     Terminated
+      Reason:       OOMKilled
+      Exit Code:    137
+      Started:      Wed, 07 Oct 2026 17:06:22 +0530
+$ kubectl get pod fail-5-oomkilled-pod -o jsonpath="{...lastState.terminated}"
+  reason=OOMKilled exitCode=137
+$ kubectl get pod fail-5-oomkilled-pod -o jsonpath="{.spec.containers[0].resources}"
+{"limits":{"memory":"20Mi"},"requests":{"memory":"20Mi"}}
+
+### 3. ROOT CAUSE
+#   The program tries to hold 100 x 10MB = ~1000MB, but the container is limited
+#   to 20Mi. The kernel OOM-killer terminates it the moment it crosses the limit.
+#   Exit code 137 = 128 + 9 (SIGKILL): the process was killed, it did not fail.
+#   kubectl logs is little help - the process dies mid-allocation.
+
+### 4. FIX - size the limit to the real working set
+#   (In production the first question is whether the usage is legitimate or a
+#    leak. Raising limits only fixes the former; this demo allocates on purpose.)
+$ grep -E "memory:|restartPolicy" fixed.yaml
+  # restartPolicy (Always) Kubernetes restarts it every time it SUCCEEDS.
+  restartPolicy: OnFailure
+          memory: "1200Mi"
+$ kubectl apply -f fixed.yaml
+pod/fail-5-oomkilled-pod created
+
+### 5. VERIFY
+$ kubectl get pod fail-5-oomkilled-pod
+NAME                   READY   STATUS      RESTARTS   AGE
+fail-5-oomkilled-pod   0/1     Completed   0          25s
+$ kubectl get pod fail-5-oomkilled-pod -o jsonpath="{...state.terminated}"
+  reason=Completed exitCode=0
+$ kubectl logs fail-5-oomkilled-pod
+Allocating memory rapidly...
+
+#   SECOND BUG, found while verifying: the first fix attempt (memory only) left
+#   RESTARTS climbing on a pod that was succeeding - lastState was Completed,
+#   exit 0. No restartPolicy was set, so it defaulted to Always and Kubernetes
+#   restarted the script after every SUCCESSFUL run. A one-shot task needs
+#   restartPolicy: OnFailure (or Never), or better, to be a Job.

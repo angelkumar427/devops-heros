@@ -1,0 +1,15 @@
+# Stuck in ContainerCreating: mounts a Secret that does not exist.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: creating-demo
+spec:
+  containers:
+    - name: app
+      image: nginx:1.27
+      volumeMounts:
+        - { name: tls, mountPath: /etc/tls, readOnly: true }
+  volumes:
+    - name: tls
+      secret:
+        secretName: app-tls-cert

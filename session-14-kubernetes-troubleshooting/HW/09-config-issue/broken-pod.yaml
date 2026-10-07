@@ -1,0 +1,22 @@
+# CreateContainerConfigError: env var references a ConfigMap key that is missing.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+data:
+  DATABASE_HOST: "db.internal"
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: config-demo
+spec:
+  containers:
+    - name: app
+      image: busybox:1.36
+      command: ["sh","-c","echo host=$DATABASE_HOST port=$DATABASE_PORT; sleep 3600"]
+      env:
+        - name: DATABASE_HOST
+          valueFrom: { configMapKeyRef: { name: app-config, key: DATABASE_HOST } }
+        - name: DATABASE_PORT
+          valueFrom: { configMapKeyRef: { name: app-config, key: DATABASE_PORT } }

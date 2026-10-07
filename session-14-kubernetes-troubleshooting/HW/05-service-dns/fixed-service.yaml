@@ -1,0 +1,12 @@
+# Corrected Service: selector matches the deployment's pod label (app: web).
+apiVersion: v1
+kind: Service
+metadata:
+  name: broken-service
+spec:
+  selector:
+    app: web
+  ports:
+    - port: 80
+      targetPort: 80
+  type: ClusterIP

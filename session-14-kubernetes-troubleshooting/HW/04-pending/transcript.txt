@@ -1,0 +1,29 @@
+### 1. IDENTIFY
+$ kubectl get pod pending-demo -o wide
+NAME           READY   STATUS    RESTARTS   AGE   IP       NODE     NOMINATED NODE   READINESS GATES
+pending-demo   0/1     Pending   0          8s    <none>   <none>   <none>           <none>
+#   NODE is <none> - the pod was never scheduled anywhere.
+
+### 2. INVESTIGATE
+$ kubectl describe pod pending-demo | grep -A2 FailedScheduling
+  Warning  FailedScheduling  7s    default-scheduler  0/1 nodes are available: 1 node(s) didn't match Pod's node affinity/selector. no new claims to deallocate, preemption: 0/1 nodes are available: 1 Preemption is not helpful for scheduling.
+$ kubectl get pod pending-demo -o jsonpath="{.spec.nodeSelector}"
+{"kubernetes.io/hostname":"node-that-does-not-exist"}
+$ kubectl get nodes --show-labels | grep -o "kubernetes.io/hostname=[^,]*"
+kubernetes.io/hostname=colima
+
+### 3. ROOT CAUSE
+#   nodeSelector demands hostname=node-that-does-not-exist. The only node is
+#   "colima", so the scheduler has nowhere legal to place the pod.
+#   Pending with NODE=<none> means it was never scheduled: resources, selectors,
+#   affinity, taints, or an unbound PVC - the FailedScheduling event names which.
+#   (Pending WITH a node assigned is different: usually images still pulling.)
+
+### 4. FIX
+$ kubectl apply -f fixed-pod.yaml
+pod/pending-demo created
+
+### 5. VERIFY
+$ kubectl get pod pending-demo -o wide
+NAME           READY   STATUS    RESTARTS   AGE   IP           NODE     NOMINATED NODE   READINESS GATES
+pending-demo   1/1     Running   0          1s    10.42.0.83   colima   <none>           <none>

@@ -1,0 +1,29 @@
+### 1. IDENTIFY - same name works in one namespace, fails in another
+$ kubectl exec client -- nslookup broken-service            # from: default
+Name:	broken-service.default.svc.cluster.local
+Address: 10.43.154.252
+$ kubectl exec -n other-team client2 -- nslookup broken-service   # from: other-team
+** server can't find broken-service.cluster.local: NXDOMAIN
+
+### 2. INVESTIGATE - the search domains differ per namespace
+$ kubectl exec -n other-team client2 -- cat /etc/resolv.conf
+nameserver 10.43.0.10
+search other-team.svc.cluster.local svc.cluster.local cluster.local
+options ndots:5
+
+### 3. ROOT CAUSE
+#   A short name is expanded with the CALLER namespace first. From other-team
+#   "broken-service" becomes broken-service.other-team.svc.cluster.local, which
+#   does not exist. DNS is working perfectly - the name is just ambiguous.
+
+### 4. FIX - qualify the name with its namespace
+$ kubectl exec -n other-team client2 -- nslookup broken-service.default.svc.cluster.local
+Name:	broken-service.default.svc.cluster.local
+Address: 10.43.154.252
+
+### 5. VERIFY
+$ kubectl exec -n other-team client2 -- wget -qO- -T 5 http://broken-service.default | grep "<title>"
+<title>Welcome to nginx!</title>
+#   Also confirmed CoreDNS itself is healthy:
+$ kubectl get pods -n kube-system -l k8s-app=kube-dns
+   coredns-54bf7cdff9-m82gg 1/1 Running

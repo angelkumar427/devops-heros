@@ -1,0 +1,36 @@
+### 1. IDENTIFY
+$ kubectl exec client -- wget -qO- -T 5 http://broken-service
+wget: can't connect to remote host (10.43.154.252): Connection refused
+command terminated with exit code 1
+#   Refused IMMEDIATELY. The name resolved to a ClusterIP, but kube-proxy has no
+#   backend to send to, so it installs a REJECT rule for that Service.
+
+### 2. INVESTIGATE
+$ kubectl get svc broken-service
+NAME             TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)   AGE
+broken-service   ClusterIP   10.43.154.252   <none>        80/TCP    4s
+$ kubectl get endpoints broken-service
+NAME             ENDPOINTS   AGE
+broken-service   <none>      4s
+#   ENDPOINTS <none> is the whole story: the Service has no backends.
+$ kubectl get svc broken-service -o jsonpath="{.spec.selector}"
+{"app":"does-not-exist"}
+$ kubectl get pods -l app=web --show-labels
+   web-7fc7749b56-6q4p4 app=web,pod-template-hash=7fc7749b56
+   web-7fc7749b56-96n9x app=web,pod-template-hash=7fc7749b56
+
+### 3. ROOT CAUSE
+#   The selector asks for app=does-not-exist; the pods are labelled app=web.
+#   A Service with a non-matching selector is VALID, so nothing errors - it
+#   just silently black-holes traffic.
+
+### 4. FIX
+$ kubectl apply -f fixed-service.yaml    # selector: app: web
+service/broken-service configured
+
+### 5. VERIFY
+$ kubectl get endpoints broken-service
+NAME             ENDPOINTS                     AGE
+broken-service   10.42.0.92:80,10.42.0.93:80   8s
+$ kubectl exec client -- wget -qO- -T 5 http://broken-service | grep "<title>"
+<title>Welcome to nginx!</title>

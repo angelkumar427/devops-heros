@@ -1,0 +1,66 @@
+################ DEPLOY & OBSERVE (healthy baseline) ################
+$ kubectl apply -f deployment.yaml -f service.yaml
+deployment.apps/troubleshooting-app created
+service/troubleshooting-service created
+$ curl troubleshooting-service
+  <title>Welcome to nginx!</title>
+
+################ BREAK ################
+$ ./break.sh
+pod/project-broken-pod created
+service/troubleshooting-service patched
+
+################ INVESTIGATE - "the app is down" ################
+$ curl troubleshooting-service
+  wget: can't connect to remote host (10.43.226.82): Connection refused
+
+$ kubectl get pods
+  project-broken-pod                       0/1    ErrImagePull
+  troubleshooting-app-9d7b5cd79-gkkb7      1/1    Running
+  troubleshooting-app-9d7b5cd79-mp9p6      1/1    Running
+#   The LOUDEST thing on screen is ErrImagePull. Tempting - but is it the cause?
+$ kubectl get pod project-broken-pod --show-labels
+  labels: <none>
+#   It carries NO app label - no Service selects it. It cannot affect this
+#   Service. RED HERRING: real, worth fixing, but not this outage.
+
+# The app pods are Running and Ready. So look at the path between them:
+$ kubectl get endpoints troubleshooting-service
+   troubleshooting-service <none>
+$ kubectl get svc troubleshooting-service -o jsonpath="{.spec.selector}"
+  {"app":"troubleshooting"}
+$ kubectl get pods -l app=troubleshooting-app --show-labels | head -2
+  pod label: app=troubleshooting-app,pod-template-hash=9d7b5cd79
+
+### ROOT CAUSE #1: selector says app=troubleshooting, pods say app=troubleshooting-app
+$ kubectl patch svc troubleshooting-service -p {selector: app=troubleshooting-app}
+service/troubleshooting-service patched
+$ kubectl get endpoints troubleshooting-service
+   troubleshooting-service 10.42.0.101:8080,10.42.0.102:8080
+$ curl troubleshooting-service
+  wget: can't connect to remote host (10.43.226.82): Connection refused
+#   Endpoints are populated now - but it STILL fails. Fixing #1 revealed #2.
+
+# Note the endpoint port:
+$ kubectl get svc troubleshooting-service -o jsonpath="{.spec.ports[0]}"
+  {"port":80,"protocol":"TCP","targetPort":8080}
+$ kubectl exec deploy/troubleshooting-app -- cat /proc/net/tcp   # LISTEN sockets, decoded
+#   (the nginx image ships neither ss nor netstat, so read the kernel table directly)
+  listening on port 80
+
+### ROOT CAUSE #2: targetPort 8080, but nginx listens on 80
+$ kubectl patch svc troubleshooting-service -p {targetPort: 80}
+service/troubleshooting-service patched
+
+################ FIX THE RED HERRING TOO ################
+$ kubectl delete pod project-broken-pod
+pod "project-broken-pod" deleted from default namespace
+
+################ VERIFY ################
+$ kubectl get endpoints troubleshooting-service
+   troubleshooting-service 10.42.0.101:80,10.42.0.102:80
+$ curl troubleshooting-service
+  <title>Welcome to nginx!</title>
+$ kubectl get pods
+  troubleshooting-app-9d7b5cd79-gkkb7      1/1    Running
+  troubleshooting-app-9d7b5cd79-mp9p6      1/1    Running

@@ -1,0 +1,35 @@
+### 1. IDENTIFY - two states, in sequence
+  t+4  s  ContainerCreating
+  t+8  s  ErrImagePull
+  t+12 s  ErrImagePull
+  t+16 s  ErrImagePull
+  t+20 s  ImagePullBackOff
+  t+24 s  ImagePullBackOff
+  t+28 s  ImagePullBackOff
+  t+32 s  ErrImagePull
+#   ErrImagePull = a pull attempt just FAILED.
+#   ImagePullBackOff = kubelet is WAITING before trying again (exponential back-off).
+#   Same root cause, two phases of the retry loop.
+
+### 2. INVESTIGATE
+$ kubectl describe pod image-demo | grep -E "Failed|pull"
+  Warning  Failed     17s (x2 over 31s)  kubelet            spec.containers{app}: Failed to pull image "nginx:this-image-does-not-exist": Error response from daemon: failed to resolve reference "docker.io/library/nginx:this-image-does-not-exist": docker.io/library/nginx:this-image-does-not-exist: not found
+$ kubectl get pod image-demo -o jsonpath="{.spec.containers[0].image}"
+nginx:this-image-does-not-exist
+
+### 3. ROOT CAUSE
+#   The tag "this-image-does-not-exist" is not published for nginx.
+#   The repository exists; the TAG does not. (Other causes of the same state:
+#   a typo in the repo name, a private registry without imagePullSecrets,
+#   or an image not built for this node architecture.)
+
+### 4. FIX
+$ grep image: fixed-pod.yaml
+      image: nginx:1.27
+$ kubectl apply -f fixed-pod.yaml
+pod/image-demo created
+
+### 5. VERIFY
+$ kubectl get pod image-demo
+NAME         READY   STATUS    RESTARTS   AGE
+image-demo   1/1     Running   0          1s

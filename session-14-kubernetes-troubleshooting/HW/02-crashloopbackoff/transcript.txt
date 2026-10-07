@@ -1,0 +1,51 @@
+### 1. IDENTIFY
+$ kubectl get pod crash-demo
+NAME         READY   STATUS   RESTARTS      AGE
+crash-demo   0/1     Error    2 (39s ago)   40s
+
+### 2. INVESTIGATE
+$ kubectl describe pod crash-demo | grep -A4 "Last State"
+    Last State:     Terminated
+      Reason:       Error
+      Exit Code:    1
+      Started:      Wed, 07 Oct 2026 16:54:19 +0530
+      Finished:     Wed, 07 Oct 2026 16:54:19 +0530
+$ kubectl logs crash-demo
+Application starting...
+Something went wrong!
+$ kubectl logs crash-demo --previous
+unable to retrieve container logs for docker://623e44d81aa9c335bf43d5482b810da0bd0f696f412adafb07c53c4c4451a438
+#   Counter-intuitive but important: while the pod waits out its back-off, the
+#   CURRENT container IS the one that just died, so plain `logs` shows the crash.
+#   --previous asks for the one BEFORE that, which kubelet already garbage-
+#   collected (it keeps one dead container per pod). Use --previous once the
+#   container has been restarted and is running/crashing again.
+$ colima ssh -- docker ps -a --filter name=k8s_app_crash-demo
+28f7d273fc0c  Exited (1) 24 seconds ago
+#   ^ exactly one dead container retained.
+
+### 3. ROOT CAUSE
+#   The process exits with code 1 every time it starts. Kubernetes restarts it
+#   (restartPolicy: Always), it dies again, and kubelet backs off exponentially.
+#   The app itself is the problem - not the image, node or network.
+$ grep -A4 "command:" broken-pod.yaml
+      command:
+        - sh
+        - -c
+        - |
+          echo "Application starting..."
+          echo "Something went wrong!"
+          exit 1
+
+### 4. FIX - the process must not exit (here: run the real workload)
+$ kubectl delete pod crash-demo && kubectl apply -f fixed-pod.yaml
+pod/crash-demo created
+
+### 5. VERIFY
+$ kubectl get pod crash-demo
+NAME         READY   STATUS    RESTARTS   AGE
+crash-demo   1/1     Running   0          16s
+$ kubectl logs crash-demo
+Application starting...
+Application is healthy
+#   Running, 0 restarts after 15s.

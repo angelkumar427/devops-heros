@@ -1,0 +1,31 @@
+$ kubectl apply -f broken-pod.yaml
+configmap/app-config created
+pod/config-demo created
+
+### 1. IDENTIFY
+$ kubectl get pod config-demo -o wide
+NAME          READY   STATUS                       RESTARTS   AGE   IP           NODE     NOMINATED NODE   READINESS GATES
+config-demo   0/1     CreateContainerConfigError   0          20s   10.42.0.86   colima   <none>           <none>
+
+### 2. INVESTIGATE
+$ kubectl describe pod config-demo | grep "Error:"
+  Warning  Failed     6s (x3 over 19s)  kubelet            spec.containers{app}: Error: couldn't find key DATABASE_PORT in ConfigMap default/app-config
+$ kubectl get configmap app-config -o jsonpath="{.data}"
+{"DATABASE_HOST":"db.internal"}
+
+### 3. ROOT CAUSE
+#   The ConfigMap EXISTS, but it has no DATABASE_PORT key. The env var references
+#   a missing key, so kubelet refuses to build the container config at all.
+#   The object being present is not enough - every referenced KEY must be too.
+
+### 4. FIX - add the missing key
+$ kubectl apply -f fixed-configmap.yaml
+configmap/app-config configured
+
+### 5. VERIFY
+$ kubectl get pod config-demo
+NAME          READY   STATUS    RESTARTS   AGE
+config-demo   1/1     Running   0          27s
+$ kubectl logs config-demo
+host=db.internal port=5432
+#   Like the Secret case, the same pod recovered by itself once the key existed.

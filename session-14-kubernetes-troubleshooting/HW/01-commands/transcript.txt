@@ -1,0 +1,76 @@
+################ kubectl get - WHAT exists and its state ################
+$ kubectl get pods -l app=demo-app
+NAME                        READY   STATUS    RESTARTS   AGE
+demo-app-67bc457d84-6hwkt   1/1     Running   0          1s
+demo-app-67bc457d84-wh9z2   1/1     Running   0          1s
+
+################ kubectl get -o wide - WHERE it runs ################
+$ kubectl get pods -l app=demo-app -o wide
+NAME                        READY   STATUS    RESTARTS   AGE   IP           NODE     NOMINATED NODE   READINESS GATES
+demo-app-67bc457d84-6hwkt   1/1     Running   0          1s    10.42.0.73   colima   <none>           <none>
+demo-app-67bc457d84-wh9z2   1/1     Running   0          1s    10.42.0.72   colima   <none>           <none>
+#   Adds IP and NODE - the first thing to check for networking issues.
+
+################ kubectl describe - WHY (spec + status + events) ################
+$ kubectl describe pod demo-app-67bc457d84-6hwkt | sed -n '/Conditions/,/Events/p'
+Conditions:
+  Type                        Status
+  PodReadyToStartContainers   True 
+  Initialized                 True 
+  Ready                       True 
+  ContainersReady             True 
+  PodScheduled                True 
+Volumes:
+$ kubectl describe pod demo-app-67bc457d84-6hwkt | tail -6     # the Events section
+  Type    Reason     Age   From               Message
+  ----    ------     ----  ----               -------
+  Normal  Scheduled  1s    default-scheduler  Successfully assigned default/demo-app-67bc457d84-6hwkt to colima
+  Normal  Pulled     1s    kubelet            spec.containers{nginx}: Container image "nginx:1.27" already present on machine and can be accessed by the pod
+  Normal  Created    1s    kubelet            spec.containers{nginx}: Container created
+  Normal  Started    1s    kubelet            spec.containers{nginx}: Container started
+
+################ kubectl logs - what the APP said ################
+$ kubectl logs demo-app-67bc457d84-6hwkt --tail=4
+2026/10/07 11:18:47 [notice] 1#1: start worker process 29
+2026/10/07 11:18:47 [notice] 1#1: start worker process 30
+2026/10/07 11:18:47 [notice] 1#1: start worker process 31
+2026/10/07 11:18:47 [notice] 1#1: start worker process 32
+#   --previous shows the logs of the LAST crashed container - essential for crashloops.
+
+################ kubectl exec - look from INSIDE the pod ################
+$ kubectl exec demo-app-67bc457d84-6hwkt -- nginx -v
+nginx version: nginx/1.27.5
+$ kubectl exec demo-app-67bc457d84-6hwkt -- cat /etc/resolv.conf
+nameserver 10.43.0.10
+search default.svc.cluster.local svc.cluster.local cluster.local
+options ndots:5
+#   resolv.conf is where DNS problems are diagnosed - search domains and nameserver.
+
+################ kubectl events - cluster-wide timeline ################
+$ kubectl events --for deployment/demo-app
+LAST SEEN   TYPE     REASON              OBJECT                MESSAGE
+1s          Normal   ScalingReplicaSet   Deployment/demo-app   Scaled up replica set demo-app-67bc457d84 from 0 to 2
+
+################ kubectl explain - built-in API reference ################
+$ kubectl explain pod.spec.containers.livenessProbe | head -8
+KIND:       Pod
+VERSION:    v1
+
+FIELD: livenessProbe <Probe>
+
+
+DESCRIPTION:
+    Periodic probe of container liveness. Container will be restarted if the
+
+################ kubectl top - live resource usage ################
+$ kubectl top pods -l app=demo-app
+  (metrics still warming up)
+$ kubectl top nodes
+NAME     CPU(cores)   CPU(%)   MEMORY(bytes)   MEMORY(%)   
+colima   157m         3%       1557Mi          19%         
+
+# (re-run after metrics-server sampled the new pods)
+$ kubectl top pods -l app=demo-app
+NAME                        CPU(cores)   MEMORY(bytes)   
+demo-app-67bc457d84-6hwkt   0m           4Mi             
+demo-app-67bc457d84-wh9z2   0m           4Mi             
