@@ -1,0 +1,66 @@
+################ init · fmt · validate ################
+$ terraform init
+  - Installed hashicorp/aws v5.100.0 (signed by HashiCorp)
+  - Installed hashicorp/random v3.9.1 (signed by HashiCorp)
+Terraform has been successfully initialized!
+$ terraform fmt -check
+  (already formatted)
+$ terraform validate
+Success! The configuration is valid.
+
+################ plan ################
+$ terraform plan -out=tfplan
+data.aws_availability_zones.available: Read complete after 0s [id=ap-south-1]
+data.aws_ami.amazon_linux: Read complete after 1s [id=ami-04681a1dbd79675a5]
+  # aws_instance.web will be created
+  # aws_internet_gateway.igw will be created
+  # aws_route_table.public will be created
+  # aws_route_table_association.public will be created
+  # aws_s3_bucket.assets will be created
+  # aws_s3_bucket_public_access_block.assets will be created
+  # aws_security_group.web will be created
+  # aws_subnet.public will be created
+  # aws_vpc.main will be created
+  # random_id.bucket_suffix will be created
+Plan: 10 to add, 0 to change, 0 to destroy.
+
+################ apply ################
+$ terraform apply tfplan
+random_id.bucket_suffix: Creation complete after 0s [id=20rWGw]
+aws_s3_bucket.assets: Creation complete after 0s [id=devops-heros-assets-db4ad61b]
+aws_s3_bucket_public_access_block.assets: Creation complete after 0s [id=devops-heros-assets-db4ad61b]
+aws_vpc.main: Creation complete after 10s [id=vpc-c532d0a223fa85857]
+aws_internet_gateway.igw: Creation complete after 0s [id=igw-6b7ef05fd3a8cb706]
+aws_security_group.web: Creation complete after 1s [id=sg-7173eba6278ef89eb]
+aws_route_table.public: Creation complete after 1s [id=rtb-d3cffa54280749a9d]
+aws_subnet.public: Creation complete after 11s [id=subnet-eed02fed5d02c88f9]
+aws_route_table_association.public: Creation complete after 0s [id=rtbassoc-048e38b44cf4044ff]
+aws_instance.web: Creation complete after 10s [id=i-0ad044485a5637968]
+Apply complete! Resources: 10 added, 0 changed, 0 destroyed.
+
+################ state ################
+$ terraform state list
+data.aws_ami.amazon_linux
+data.aws_availability_zones.available
+aws_instance.web
+aws_internet_gateway.igw
+aws_route_table.public
+aws_route_table_association.public
+aws_s3_bucket.assets
+aws_s3_bucket_public_access_block.assets
+aws_security_group.web
+aws_subnet.public
+aws_vpc.main
+random_id.bucket_suffix
+
+################ output ################
+$ terraform output
+ami_id = "ami-04681a1dbd79675a5"
+availability_zone = "ap-south-1a"
+instance_id = "i-0ad044485a5637968"
+instance_private_ip = "10.0.1.4"
+instance_public_ip = "54.214.91.44"
+public_subnet_id = "subnet-eed02fed5d02c88f9"
+s3_bucket = "devops-heros-assets-db4ad61b"
+security_group_id = "sg-7173eba6278ef89eb"
+vpc_id = "vpc-c532d0a223fa85857"

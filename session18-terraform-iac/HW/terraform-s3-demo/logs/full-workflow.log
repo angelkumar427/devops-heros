@@ -1,0 +1,91 @@
+$ terraform version
+Terraform v1.16.5
+
+################ 1. terraform init ################
+$ terraform init
+Initializing the backend...
+Initializing provider plugins...
+  - Installed hashicorp/aws v5.100.0 (signed by HashiCorp)
+  - Installed hashicorp/random v3.9.1 (signed by HashiCorp)
+Terraform has been successfully initialized!
+
+################ 2. terraform fmt ################
+$ terraform fmt -check -diff
+  (no output = all files already formatted)
+
+################ 3. terraform validate ################
+$ terraform validate
+Success! The configuration is valid.
+
+################ 4. terraform plan ################
+$ terraform plan -out=tfplan
+  # aws_s3_bucket.this will be created
+  # aws_s3_bucket_public_access_block.this will be created
+  # aws_s3_bucket_server_side_encryption_configuration.this will be created
+  # aws_s3_bucket_versioning.this will be created
+  # aws_s3_object.readme will be created
+  # random_id.suffix will be created
+Plan: 6 to add, 0 to change, 0 to destroy.
+
+################ 5. terraform apply ################
+$ terraform apply tfplan
+random_id.suffix: Creation complete after 0s [id=2lo1FQ]
+aws_s3_bucket.this: Creation complete after 0s [id=devops-heros-dev-da5a3515]
+aws_s3_bucket_public_access_block.this: Creation complete after 0s [id=devops-heros-dev-da5a3515]
+aws_s3_bucket_server_side_encryption_configuration.this: Creation complete after 0s [id=devops-heros-dev-da5a3515]
+aws_s3_bucket_versioning.this: Creation complete after 2s [id=devops-heros-dev-da5a3515]
+aws_s3_object.readme: Creation complete after 0s [id=welcome.txt]
+Apply complete! Resources: 6 added, 0 changed, 0 destroyed.
+
+################ 6. terraform show ################
+$ terraform state list
+aws_s3_bucket.this
+aws_s3_bucket_public_access_block.this
+aws_s3_bucket_server_side_encryption_configuration.this
+aws_s3_bucket_versioning.this
+aws_s3_object.readme
+random_id.suffix
+$ terraform show | grep -E "bucket  *=|sse_algorithm|block_public_acls|restrict_public|force_destroy"
+# aws_s3_bucket.this:
+    bucket                      = "devops-heros-dev-da5a3515"
+    force_destroy               = true
+    block_public_acls       = true
+    bucket                  = "devops-heros-dev-da5a3515"
+    restrict_public_buckets = true
+    bucket                = "devops-heros-dev-da5a3515"
+            sse_algorithm     = "AES256"
+
+################ 7. terraform output ################
+$ terraform output
+bucket_arn = "arn:aws:s3:::devops-heros-dev-da5a3515"
+bucket_name = "devops-heros-dev-da5a3515"
+bucket_region = "ap-south-1"
+sample_object = "s3://devops-heros-dev-da5a3515/welcome.txt"
+versioning_status = "Enabled"
+
+################ Independent check - S3 API directly, not Terraform ################
+$ aws s3api list-buckets
+  devops-heros-dev-da5a3515
+$ aws s3api get-bucket-versioning --bucket devops-heros-dev-da5a3515
+  Status: Enabled
+$ aws s3api get-bucket-encryption --bucket devops-heros-dev-da5a3515
+  SSEAlgorithm: AES256
+$ aws s3api get-public-access-block --bucket devops-heros-dev-da5a3515
+   {'BlockPublicAcls': True, 'IgnorePublicAcls': True, 'BlockPublicPolicy': True, 'RestrictPublicBuckets': True}
+$ aws s3 cp s3://devops-heros-dev-da5a3515/welcome.txt -
+  Created by Terraform for devops-heros (dev)
+
+################ 8. terraform destroy ################
+$ terraform destroy -auto-approve
+aws_s3_bucket_server_side_encryption_configuration.this: Destruction complete after 0s
+aws_s3_bucket_public_access_block.this: Destruction complete after 0s
+aws_s3_object.readme: Destruction complete after 0s
+aws_s3_bucket_versioning.this: Destruction complete after 0s
+aws_s3_bucket.this: Destruction complete after 0s
+random_id.suffix: Destruction complete after 0s
+Destroy complete! Resources: 6 destroyed.
+
+$ aws s3api list-buckets
+  (no buckets)
+$ terraform state list
+  (state is empty)

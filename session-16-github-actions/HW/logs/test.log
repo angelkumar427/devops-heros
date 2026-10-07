@@ -1,0 +1,21 @@
+# GitHub Actions log - job: Test (Python 3.12), run 37623605939
+$ python -m pytest -v --junitxml=test-results.xml --cov=app
+============================= test session starts ==============================
+tests/test_calculator.py::test_add PASSED                                [ 10%]
+tests/test_calculator.py::test_subtract PASSED                           [ 20%]
+tests/test_calculator.py::test_multiply PASSED                           [ 30%]
+tests/test_calculator.py::test_divide PASSED                             [ 40%]
+tests/test_calculator.py::test_divide_by_zero_raises PASSED              [ 50%]
+tests/test_server.py::test_health PASSED                                 [ 60%]
+tests/test_server.py::test_add_endpoint PASSED                           [ 70%]
+tests/test_server.py::test_divide_by_zero_is_400 PASSED                  [ 80%]
+tests/test_server.py::test_unknown_operation_is_404 PASSED               [ 90%]
+tests/test_server.py::test_missing_params_is_400 PASSED                  [100%]
+Name                Stmts   Miss  Cover
+---------------------------------------
+app/__init__.py         0      0   100%
+app/calculator.py      11      0   100%
+app/server.py          23      1    96%
+---------------------------------------
+TOTAL                  34      1    97%
+============================== 10 passed in 0.40s ==============================

@@ -17,3 +17,12 @@
 # Logs & temp
 *.log
 tmp/
+
+# Homework evidence logs are deliberate deliverables (linked from the READMEs) - keep them
+!**/HW/**/logs/*.log
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage

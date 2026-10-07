@@ -1,0 +1,44 @@
+################ Monitoring the demo app with PromQL ################
+
+# Application health - is each instance being scraped successfully?
+$ up{job="podinfo"}
+   podinfo-74bf7d9db9-5cc4h           1 
+   podinfo-74bf7d9db9-cvbzg           1 
+
+# CPU utilisation - cores used per pod (5m rate)
+$ sum by (pod) (rate(container_cpu_usage_seconds_total{namespace="demo",pod=~"podinfo-.*"}[5m]))
+   podinfo-74bf7d9db9-cvbzg           0.0002 cores
+   podinfo-74bf7d9db9-5cc4h           0.0002 cores
+
+# Memory utilisation - working set per pod
+$ sum by (pod) (container_memory_working_set_bytes{namespace="demo",pod=~"podinfo-.*"}) / 1024 / 1024
+   podinfo-74bf7d9db9-cvbzg           17.4 MiB
+   podinfo-74bf7d9db9-5cc4h           16.6 MiB
+
+# Memory as a % of the container limit (128Mi)
+$ sum by (pod) (working_set) / sum by (pod) (kube_pod_container_resource_limits{resource="memory"}) * 100
+   podinfo-74bf7d9db9-cvbzg           13.6 %
+   podinfo-74bf7d9db9-5cc4h           13.0 %
+
+# Application metrics the app exposes itself - HTTP requests by status
+$ sum by (status) (http_requests_total{namespace="demo"})
+   status 200    77 requests
+
+# Node-level CPU and memory (node-exporter)
+$ 100 - avg(rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100
+   node CPU busy: 39.7 %
+$ (1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) * 100
+   node memory used: 38.7 %
+
+# Everything Prometheus is watching
+$ count by (job) (up == 1)
+   apiserver                                    1 healthy target(s)
+   coredns                                      1 healthy target(s)
+   kube-state-metrics                           1 healthy target(s)
+   kubelet                                      3 healthy target(s)
+   monitoring-grafana                           1 healthy target(s)
+   monitoring-kube-prometheus-alertmanager      2 healthy target(s)
+   monitoring-kube-prometheus-operator          1 healthy target(s)
+   monitoring-kube-prometheus-prometheus        2 healthy target(s)
+   node-exporter                                1 healthy target(s)
+   podinfo                                      2 healthy target(s)

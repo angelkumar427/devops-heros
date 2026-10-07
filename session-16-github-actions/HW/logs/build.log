@@ -1,0 +1,14 @@
+# GitHub Actions log - job: Build & push image, run 37623605939
+Image will be: ghcr.io/angelkumar427/session16-calculator:28b45c3
+{"status":"ok","version":"28b45c3"}
+{"a":2.0,"b":3.0,"operation":"add","result":5.0}
+9cec7a78a449: Pushed
+d1e1a416fc98: Pushed
+7aae00857d20: Pushed
+e97bf784d371: Pushed
+2de89c75847a: Pushed
+15f1c8eb1ab1: Pushed
+28b45c3: digest: sha256:82356cab9fbb18f28e3501e12b95ba3bd4947b7652cec0c8595a3a75231e1f03 size: 2199
+image=ghcr.io/angelkumar427/session16-calculator:28b45c3
+commit=28b45c303e33b16c926831ce045408edec96f49f
+built_at=2026-10-07T12:48:54Z

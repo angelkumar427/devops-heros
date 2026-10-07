@@ -1,0 +1,18 @@
+################ ALERT 1: PodinfoHighCPU ################
+# rule: sum(rate(container_cpu_usage_seconds_total{...pod=~"podinfo-.*"}[1m])) > 0.2   for: 30s
+$ kubectl apply -f load-generator.yaml
+deployment.apps/load-generator created
+  TIME     CPU-CORES    ALERT-STATE
+  t+15s    0.001        inactive
+  t+30s    0.024        unknown
+  t+45s    0.347        pending
+  t+60s    0.707        pending
+  t+75s    0.799        firing
+
+# Alertmanager received it:
+$ curl alertmanager:9093/api/v2/alerts
+   PodinfoHighCPU   severity=warning   state=active   podinfo is using 0.87 cores (threshold 0.2).
+
+$ kubectl delete -f load-generator.yaml     # remove the load
+deployment.apps "load-generator" deleted from demo namespace
+  t+105s   0.000        inactive   <- resolved

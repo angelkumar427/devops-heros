@@ -1,0 +1,22 @@
+################ 1. Point Argo CD at the Git repository ################
+$ kubectl apply -f argocd-application.yaml
+application.argoproj.io/gitops-demo created
+
+# No kubectl apply of the app itself - Argo CD pulls it from GitHub:
+  t+5s   sync=  health=  revision=
+  t+10s  sync=  health=  revision=
+  t+15s  sync=Synced  health=Healthy  revision=c5e6fc9
+
+$ kubectl get application gitops-demo -n argocd
+NAME          SYNC STATUS   HEALTH STATUS
+gitops-demo   Synced        Healthy
+
+$ kubectl get deploy,pods -n gitops-demo
+  deployment.apps/gitops-demo                  2/2 2
+  pod/gitops-demo-ddb9dccf4-bh4h5              1/1 Running
+  pod/gitops-demo-ddb9dccf4-xxf7k              1/1 Running
+
+$ kubectl get deploy gitops-demo -n gitops-demo -o jsonpath="{...PODINFO_UI_MESSAGE}"
+  Deployed by Argo CD from Git - version 1
+# The revision Argo CD deployed is the commit just pushed to GitHub:
+$ git log -1 --format=%h   ->  c5e6fc9

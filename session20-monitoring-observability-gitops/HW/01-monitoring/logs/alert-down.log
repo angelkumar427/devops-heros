@@ -1,0 +1,18 @@
+################ ALERT 2: PodinfoDown (application health) ################
+# rule: absent(up{job="podinfo", namespace="demo"} == 1)   for: 30s
+$ kubectl scale deploy/podinfo -n demo --replicas=0
+deployment.apps/podinfo scaled
+  TIME     HEALTHY-PODS   ALERT-STATE
+  t+15s    2              inactive
+  t+30s    2              inactive
+  t+45s    none           inactive
+  t+60s    none           pending
+  t+75s    none           pending
+  t+90s    none           firing
+
+$ curl alertmanager:9093/api/v2/alerts
+   PodinfoDown    severity=critical  state=active   No podinfo instance has been reachable for 30s.
+
+$ kubectl scale deploy/podinfo -n demo --replicas=2     # recover
+deployment.apps/podinfo scaled
+  t+45s    2              inactive   <- resolved

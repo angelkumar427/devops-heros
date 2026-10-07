@@ -1,0 +1,52 @@
+################ Independent check - the AWS APIs directly, not Terraform ################
+$ aws ec2 describe-vpcs --vpc-ids vpc-c532d0a223fa85857
+   vpc-c532d0a223fa85857 10.0.0.0/16 available
+$ aws ec2 describe-subnets --subnet-ids subnet-eed02fed5d02c88f9
+   subnet-eed02fed5d02c88f9 10.0.1.0/24 ap-south-1a MapPublicIpOnLaunch=True
+$ aws ec2 describe-route-tables  (routes of the subnet's table)
+   10.0.0.0/16    -> local
+   0.0.0.0/0      -> igw-6b7ef05fd3a8cb706
+$ aws ec2 describe-security-groups --group-ids sg-7173eba6278ef89eb
+   inbound  tcp/22   from ['203.0.113.10/32']
+   inbound  tcp/80   from ['0.0.0.0/0']
+$ aws ec2 describe-instances --instance-ids i-0ad044485a5637968
+   i-0ad044485a5637968 t3.micro running ami=ami-04681a1dbd79675a5
+   subnet=subnet-eed02fed5d02c88f9 private=10.0.1.4 public=54.214.91.44
+   security groups: ['sg-7173eba6278ef89eb']
+   IMDSv2 required: required
+
+################ A change: update in place ################
+# Add a tag to the instance and see what Terraform decides to do:
+$ terraform plan
+  # aws_instance.web will be updated in-place
+          + "Tier" = "frontend"
+          + "Tier"        = "frontend"
+Plan: 0 to add, 1 to change, 0 to destroy.
+#   "updated in-place": Terraform modifies the existing instance - no replacement,
+#   no downtime. Changing the AMI or subnet instead would force a REPLACE.
+$ terraform apply -auto-approve
+aws_instance.web: Modifications complete after 0s [id=i-0ad044485a5637968]
+Apply complete! Resources: 0 added, 1 changed, 0 destroyed.
+   tags now: [('Environment', 'dev'), ('ManagedBy', 'Terraform'), ('Name', 'devops-heros-web'), ('Project', 'devops-heros'), ('Tier', 'frontend')]
+
+################ destroy ################
+$ terraform destroy -auto-approve
+aws_s3_bucket_public_access_block.assets: Destruction complete after 0s
+aws_s3_bucket.assets: Destruction complete after 0s
+random_id.bucket_suffix: Destruction complete after 0s
+aws_instance.web: Destruction complete after 10s
+aws_route_table_association.public: Destruction complete after 0s
+aws_security_group.web: Destruction complete after 0s
+aws_subnet.public: Destruction complete after 0s
+aws_route_table.public: Destruction complete after 0s
+aws_internet_gateway.igw: Destruction complete after 0s
+aws_vpc.main: Destruction complete after 0s
+Destroy complete! Resources: 10 destroyed.
+
+# Verify every resource is really gone:
+$ aws ec2 describe-instances --instance-ids i-0ad044485a5637968
+   state: terminated
+$ aws ec2 describe-vpcs --vpc-ids vpc-c532d0a223fa85857
+    ClientError: VpcID {'vpc-c532d0a223fa85857'} does not exist.
+$ terraform state list
+  (state is empty)

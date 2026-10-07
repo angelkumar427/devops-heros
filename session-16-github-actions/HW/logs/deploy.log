@@ -1,0 +1,16 @@
+# GitHub Actions log - job: Deploy to Kubernetes, run 37623605939
+Creating cluster "cicd-demo" ...
+ • Ready after 18s 💚
+Status: Downloaded newer image for ghcr.io/angelkumar427/session16-calculator:28b45c3
+Image: "ghcr.io/angelkumar427/session16-calculator:28b45c3" with ID "sha256:343365ba0f5713bf252e806706b21abcb1072d7ea003deb6297d426dd735ad29" not yet present on node "cicd-demo-control-plane", loading...
+deployment.apps/calculator created
+service/calculator created
+deployment "calculator" successfully rolled out
+NAME                         READY   UP-TO-DATE   AVAILABLE   AGE   CONTAINERS   IMAGES                                                   SELECTOR
+deployment.apps/calculator   2/2     2            2           2s    calculator   ghcr.io/angelkumar427/session16-calculator:28b45c3   app=calculator
+NAME                              READY   STATUS    RESTARTS   AGE   IP           NODE                      NOMINATED NODE   READINESS GATES
+pod/calculator-7f64646d58-bfl6d   1/1     Running   0          2s    10.244.0.5   cicd-demo-control-plane   <none>           <none>
+pod/calculator-7f64646d58-cvv6z   1/1     Running   0          2s    10.244.0.6   cicd-demo-control-plane   <none>           <none>
+{"status":"ok","version":"28b45c3"}
+{"a":6.0,"b":7.0,"operation":"multiply","result":42.0}
+(divide by zero correctly rejected)

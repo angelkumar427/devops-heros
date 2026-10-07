@@ -1,0 +1,33 @@
+################ 3. Change the app by committing to Git ################
+$ git diff app/deployment.yaml
+-  replicas: 2
++  replicas: 3
+-              value: "Deployed by Argo CD from Git - version 1"
++              value: "Deployed by Argo CD from Git - version 2"
+$ git commit -m "scale to 3 replicas, version 2" && git push
+   pushed as bf2b8f0
+
+# Argo CD polls Git every ~3 minutes. A GitHub webhook would notify it
+# instantly; here the same "refresh" signal is sent by hand:
+$ kubectl annotate application gitops-demo -n argocd argocd.argoproj.io/refresh=normal
+application.argoproj.io/gitops-demo annotated
+  TIME    REVISION   REPLICAS   SYNC
+  t+3s    c5e6fc9    2          Synced
+  t+6s    bf2b8f0    2          OutOfSync
+  t+9s    bf2b8f0    2          OutOfSync
+  t+12s   bf2b8f0    3          Synced
+
+$ kubectl get deploy,pods -n gitops-demo
+  deployment.apps/gitops-demo                  3/3 3
+  pod/gitops-demo-6c8b46cb4f-79h27             1/1 Running
+  pod/gitops-demo-6c8b46cb4f-hplvq             1/1 Running
+  pod/gitops-demo-6c8b46cb4f-wc7xl             0/1 ContainerCreating
+  pod/gitops-demo-ddb9dccf4-bh4h5              1/1 Running
+  pod/gitops-demo-ddb9dccf4-nr44g              1/1 Terminating
+  pod/gitops-demo-ddb9dccf4-xxf7k              1/1 Terminating
+$ kubectl get deploy gitops-demo -n gitops-demo -o jsonpath="{...PODINFO_UI_MESSAGE}"
+  Deployed by Argo CD from Git - version 2
+
+$ kubectl get application gitops-demo -n argocd -o jsonpath="{.status.history}"   # deploy history = git history
+  deployed c5e6fc9 at 2026-10-07T14:19:05Z
+  deployed bf2b8f0 at 2026-10-07T14:19:58Z

@@ -1,0 +1,18 @@
+################ Drift detection (real run) ################
+# Someone deletes the object by hand, outside Terraform:
+$ aws s3 rm s3://devops-heros-dev-88bf5bd5/welcome.txt
+  delete: s3://devops-heros-dev-88bf5bd5/welcome.txt
+
+$ terraform plan
+  # aws_s3_object.readme will be created
+Plan: 1 to add, 0 to change, 0 to destroy.
+#   Terraform compares REAL infrastructure with the state file and the code,
+#   notices the object is gone, and plans to put it back.
+
+$ terraform apply -auto-approve
+aws_s3_object.readme: Creating...
+aws_s3_object.readme: Creation complete after 0s [id=welcome.txt]
+Apply complete! Resources: 1 added, 0 changed, 0 destroyed.
+$ aws s3 cp s3://devops-heros-dev-88bf5bd5/welcome.txt -
+  Created by Terraform for devops-heros (dev)
+

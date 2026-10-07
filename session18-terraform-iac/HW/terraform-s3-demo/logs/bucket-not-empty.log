@@ -1,0 +1,18 @@
+################ Why the first destroy hung (real output) ################
+$ terraform state list          # after the destroy stalled
+aws_s3_bucket.this
+aws_s3_object.readme
+random_id.suffix
+
+$ aws s3api list-object-versions --bucket devops-heros-dev-88bf5bd5
+   version       welcome.txt 7dda6289-f84 latest
+   version       welcome.txt 26976599-842
+   delete-marker welcome.txt c6521a8b-49b
+
+$ aws s3api delete-bucket --bucket devops-heros-dev-88bf5bd5
+ClientError : An error occurred (BucketNotEmpty) when calling the DeleteBucket
+operation: The bucket you tried to delete is not empty
+
+# Versioning keeps EVERY version. The manual delete in the drift demo only added
+# a delete marker, and Terraform's re-create wrote a second version. The bucket
+# was never empty, so it could not be deleted.

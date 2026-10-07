@@ -1,0 +1,17 @@
+################ A silent alert - found and fixed ################
+# The first version of the CPU alert filtered on the `container` label:
+$ sum(rate(container_cpu_usage_seconds_total{namespace="demo", container="podinfo"}[1m]))
+   NO DATA (empty result)
+
+# Why: on k3s with the Docker runtime (cri-dockerd), cAdvisor reports POD-level
+# cgroups only. The real label set has no `container` label at all:
+$ container_cpu_usage_seconds_total{namespace="demo"}
+   {'cpu': 'total', 'id': '/kubepods/burstable/pod2b9aef83-...', 'job': 'kubelet', 'pod': 'podinfo-74bf7d9db9-cvbzg'}
+   {'cpu': 'total', 'id': '/kubepods/burstable/podbb6a196c-...', 'job': 'kubelet', 'pod': 'podinfo-74bf7d9db9-5cc4h'}
+
+# An alert on an empty expression does NOT error. It shows "inactive" forever,
+# indistinguishable from a healthy system - so it would never have fired.
+
+# Fixed: filter on `pod` instead
+$ sum(rate(container_cpu_usage_seconds_total{namespace="demo", pod=~"podinfo-.*"}[1m]))
+   0.0007 cores

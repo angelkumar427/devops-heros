@@ -1,0 +1,17 @@
+################ 2. Self-healing: drift is reverted automatically ################
+# Someone changes the cluster by hand, bypassing Git:
+$ kubectl scale deploy/gitops-demo -n gitops-demo --replicas=5
+deployment.apps/gitops-demo scaled
+  TIME    REPLICAS   ARGO-CD
+  t+2s    5          Synced
+  t+4s    2          Synced
+
+$ kubectl get application gitops-demo -n argocd -o jsonpath="{.status.operationState.message}"
+  successfully synced (all tasks run)
+#   Git says 2 replicas, so the cluster goes back to 2. The manual change is undone.
+
+# The same for a deleted resource:
+$ kubectl delete service gitops-demo -n gitops-demo
+service "gitops-demo" deleted from gitops-demo namespace
+$ kubectl get service gitops-demo -n gitops-demo
+  gitops-demo  ClusterIP  10.43.182.224  9898/TCP   <- recreated by Argo CD

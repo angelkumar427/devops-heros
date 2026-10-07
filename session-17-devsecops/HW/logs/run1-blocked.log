@@ -1,0 +1,26 @@
+# RUN 1 (vulnerable) - job: SCA (pip-audit)
+$ pip-audit -r requirements.txt
+Found 2 known vulnerabilities in 1 package
+Name  Version ID              Fix Versions
+----- ------- --------------- ------------
+flask 3.1.1   PYSEC-2026-2151 3.1.3
+flask 3.1.1   PYSEC-2026-2151 3.1.3
+##[error]Process completed with exit code 1.
+
+# RUN 1 (vulnerable) - job: Security gate
+SAST           success
+SCA            failure
+Secret scan    success
+Image scan     success
+SECURITY GATE: FAILED - image will NOT be pushed or deployed
+##[error]Process completed with exit code 1.
+
+# RUN 1 - downstream jobs
+  Build & unit test                    success
+  SAST (Bandit)                        success
+  SCA (pip-audit)                      failure
+  Docker build & image scan (Trivy)    success
+  Secret scan (Gitleaks)               success
+  Security gate                        failure
+  Push image                           skipped
+  Deploy to Kubernetes                 skipped

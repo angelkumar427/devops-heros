@@ -1,0 +1,53 @@
+# RUN 2 (fixed) - every stage, from the GitHub Actions logs
+
+## Unit tests
+tests/test_server.py::test_health PASSED
+tests/test_server.py::test_create_and_get_note PASSED
+tests/test_server.py::test_list_notes PASSED
+tests/test_server.py::test_rejects_invalid_text[payload0] PASSED
+tests/test_server.py::test_rejects_invalid_text[payload1] PASSED
+tests/test_server.py::test_rejects_invalid_text[payload2] PASSED
+tests/test_server.py::test_rejects_invalid_text[payload3] PASSED
+tests/test_server.py::test_rejects_oversized_note PASSED
+tests/test_server.py::test_missing_note_is_404 PASSED
+============================== 9 passed in 0.66s ===============================
+
+## SAST - bandit -r app -ll
+	No issues identified.
+	Total lines of code: 43
+		Medium: 0
+		High: 0
+
+## SCA - pip-audit -r requirements.txt
+No known vulnerabilities found
+
+## Secret scan - gitleaks
+1:02PM INF scanned ~4800 bytes (4.80 KB) in 4.37ms
+1:02PM INF no leaks found
+
+## Image scan - trivy (HIGH,CRITICAL, fixable only)
+2026-10-07T13:02:19Z	INFO	Detected OS	family="debian" version="13.7"
+2026-10-07T13:02:19Z	INFO	[debian] Detecting vulnerabilities...	os_version="13" pkg_num=87
+│                                    Target                                    │    Type    │ Vulnerabilities │ Secrets │
+│ ghcr.io/angelkumar427/session17-notes-api:2757369 (debian 13.7)          │   debian   │        0        │    -    │
+│ usr/local/lib/python3.12/site-packages/blinker-1.9.0.dist-info/METADATA      │ python-pkg │        0        │    -    │
+│ usr/local/lib/python3.12/site-packages/click-8.5.0.dist-info/METADATA        │ python-pkg │        0        │    -    │
+│ usr/local/lib/python3.12/site-packages/flask-3.1.3.dist-info/METADATA        │ python-pkg │        0        │    -    │
+│ usr/local/lib/python3.12/site-packages/gunicorn-23.0.0.dist-info/METADATA    │ python-pkg │        0        │    -    │
+
+## Security gate
+SAST           success
+SCA            success
+Secret scan    success
+Image scan     success
+SECURITY GATE: PASSED
+
+## Push image
+2757369: digest: sha256:a2f514b155b76a4f13d178e8975ac0b1c1c2b881f6474ad6b4edb20f5607e3af size: 2198
+
+## Deploy + verify
+deployment.apps/notes-api created
+deployment "notes-api" successfully rolled out
+deployment.apps/notes-api   2/2     2            2           3s    notes-api    ghcr.io/angelkumar427/session17-notes-api:2757369   app=notes-api
+{"status":"ok","version":"2757369"}
+{"id":1,"text":"shipped through the gate"}

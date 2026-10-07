@@ -1,0 +1,13 @@
+################ Logs - what the application itself records ################
+$ kubectl logs -n demo deploy/podinfo --tail=6
+{"level":"info","ts":"2026-10-07T14:14:14.819Z","caller":"podinfo/main.go:153","msg":"Starting podinfo","version":"6.7.1","revision":"6b7aab8a10d6ee8b895b0a5048f4ab0966ed29ff","port":"9898"}
+{"level":"info","ts":"2026-10-07T14:14:14.819Z","caller":"http/server.go:224","msg":"Starting HTTP Server.","addr":":9898"}
+
+# podinfo writes STRUCTURED (JSON) logs - every line is machine-parseable, so a
+# log system can filter by level, path or status instead of grepping free text.
+
+$ kubectl logs -n demo deploy/podinfo --since=10m | grep -c "\"level\":\"info\""
+2
+$ kubectl logs -n demo -l app=podinfo --prefix --tail=1      # one line per replica
+[pod/podinfo-74bf7d9db9-swxvn/podinfo] {"level":"info","ts":"2026-10-07T14:14:14.819Z","caller":"http/server.go:224","msg":"Starting HTTP Server.","addr":":9898"}
+[pod/podinfo-74bf7d9db9-wnh85/podinfo] {"level":"info","ts":"2026-10-07T14:14:14.802Z","caller":"http/server.go:224","msg":"Starting HTTP Server.","addr":":9898"}
