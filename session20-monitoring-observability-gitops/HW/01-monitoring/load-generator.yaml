@@ -1,0 +1,19 @@
+# ApacheBench load against podinfo, to drive CPU past the alert threshold.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: load-generator
+  namespace: demo
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: load-generator }
+  template:
+    metadata:
+      labels: { app: load-generator }
+    spec:
+      containers:
+        - name: ab
+          image: httpd:2.4-alpine
+          command: ["/bin/sh","-c"]
+          args: ["while true; do ab -c 50 -n 100000 -q http://podinfo.demo:9898/ >/dev/null 2>&1; done"]

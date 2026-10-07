@@ -1,0 +1,33 @@
+# Custom alerting rules for the demo app.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: podinfo-alerts
+  namespace: demo
+spec:
+  groups:
+    - name: podinfo.rules
+      rules:
+        # Application health: no healthy podinfo target is being scraped.
+        - alert: PodinfoDown
+          expr: absent(up{job="podinfo", namespace="demo"} == 1)
+          for: 30s
+          labels: { severity: critical }
+          annotations:
+            summary: "podinfo is down"
+            description: "No podinfo instance has been reachable for 30s."
+
+        # CPU utilisation: the app is using more than 0.2 cores in total.
+        #
+        # Filters on `pod`, NOT `container`. On this cluster (k3s + cri-dockerd),
+        # cAdvisor reports pod-level cgroups only and emits no `container` label, so
+        # a `container="podinfo"` matcher returns NOTHING - and an alert whose
+        # expression matches nothing never fires and never errors. It just sits
+        # "inactive" forever, which is the most dangerous way for an alert to fail.
+        - alert: PodinfoHighCPU
+          expr: sum(rate(container_cpu_usage_seconds_total{namespace="demo", pod=~"podinfo-.*"}[1m])) > 0.2
+          for: 30s
+          labels: { severity: warning }
+          annotations:
+            summary: "podinfo CPU usage is high"
+            description: "podinfo is using {{ $value | printf \"%.2f\" }} cores (threshold 0.2)."
