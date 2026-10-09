@@ -26,7 +26,7 @@ env:
 jobs:
   backend-tests:
     name: Backend tests (pytest)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     defaults: { run: { working-directory: session21-capstone/backend } }
     steps:
       - uses: actions/checkout@v7
@@ -44,7 +44,7 @@ jobs:
 
   migrations:
     name: Alembic migrations on PostgreSQL
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     services:
       postgres:
         image: postgres:18-alpine
@@ -68,7 +68,7 @@ jobs:
 
   frontend-build:
     name: Frontend build (React + Vite)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     defaults: { run: { working-directory: session21-capstone/frontend } }
     steps:
       - uses: actions/checkout@v7
@@ -83,7 +83,7 @@ jobs:
 
   security:
     name: Secret scan + SAST
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
       - name: Gitleaks (no credentials committed)
@@ -98,7 +98,7 @@ jobs:
   images:
     name: Build + Trivy scan (${{ matrix.component }})
     needs: [backend-tests, migrations, frontend-build, security]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     strategy:
       matrix:
         component: [backend, frontend]
@@ -125,7 +125,7 @@ jobs:
     name: Push ${{ matrix.component }} to GHCR
     needs: images
     if: github.event_name != 'pull_request'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     strategy:
       matrix:
         component: [backend, frontend]
@@ -141,7 +141,7 @@ jobs:
   deploy:
     name: Deploy with Helm + smoke test
     needs: push
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
       - name: Kubernetes cluster (kind) - kubectl is configured by the action
