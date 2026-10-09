@@ -2,16 +2,18 @@
 # Load a realistic demo catalogue through the public API (so it exercises validation too).
 #   ./scripts/seed.sh                      # docker compose  (http://localhost:8000)
 #   API=http://stockpilot.local ./scripts/seed.sh   # through the Kubernetes Ingress
+#   API=http://localhost HOST_HEADER=stockpilot.local ./scripts/seed.sh   # same, without editing /etc/hosts
 set -euo pipefail
 API="${API:-http://localhost:8000}"
+CURL=(curl -sS); [ -n "${HOST_HEADER:-}" ] && CURL+=(-H "Host: $HOST_HEADER")
 add() {  # sku name category qty reorder price  (JSON built by python, so quotes in names are safe)
   body=$(python3 -c 'import json,sys; s,n,c,q,r,p=sys.argv[1:]
 print(json.dumps({"sku":s,"name":n,"category":c,"quantity":int(q),"reorder_level":int(r),"unit_price":p}))' "$@")
-  curl -sS -o /dev/null -w "  %{http_code}  $1\n" -X POST "$API/api/products" -H 'Content-Type: application/json' -d "$body"
+  "${CURL[@]}" -o /dev/null -w "  %{http_code}  $1\n" -X POST "$API/api/products" -H 'Content-Type: application/json' -d "$body"
 }
 adjust() {  # sku change reason
-  id=$(curl -fsS "$API/api/products?q=$1" | python3 -c "import json,sys; print(json.load(sys.stdin)[0]['id'])")
-  curl -fsS -o /dev/null -w "  %{http_code}  $1 $2 ($3)\n" -X POST "$API/api/products/$id/adjust" \
+  id=$("${CURL[@]}" -f "$API/api/products?q=$1" | python3 -c "import json,sys; print(json.load(sys.stdin)[0]['id'])")
+  "${CURL[@]}" -f -o /dev/null -w "  %{http_code}  $1 $2 ($3)\n" -X POST "$API/api/products/$id/adjust" \
     -H 'Content-Type: application/json' -d "{\"change\":$2,\"reason\":\"$3\"}"
 }
 echo "Seeding $API"
