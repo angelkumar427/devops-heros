@@ -1,0 +1,176 @@
+# Reference copy. GitHub runs workflows only from the repository root, so the live pipeline is
+# .github/workflows/session21-capstone.yml at the top of this repo - this file is identical.
+# Session 21 capstone - StockPilot CI/CD
+#   test (pytest + migrations on real Postgres + frontend build) -> secret scan + SAST
+#   -> build both images -> Trivy scan both (fails on HIGH/CRITICAL) -> push to GHCR (tag = commit SHA)
+#   -> deploy with Helm to a Kubernetes (kind) cluster -> smoke test through the running stack
+name: Session 21 - Capstone (StockPilot)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "session21-capstone/**"
+      - ".github/workflows/session21-capstone.yml"
+  pull_request:
+    paths: ["session21-capstone/**"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  APP_DIR: session21-capstone
+
+jobs:
+  backend-tests:
+    name: Backend tests (pytest)
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: session21-capstone/backend } }
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: session21-capstone/backend/requirements-dev.txt
+      - run: pip install -r requirements-dev.txt
+      - name: pytest (fails the build on any test failure)
+        run: python -m pytest -v --cov=app --cov-report=term --junitxml=test-results.xml
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with: { name: backend-test-results, path: session21-capstone/backend/test-results.xml }
+
+  migrations:
+    name: Alembic migrations on PostgreSQL
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env: { POSTGRES_DB: stockpilot, POSTGRES_USER: stockpilot, POSTGRES_PASSWORD: ci-only }
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U stockpilot" --health-interval 5s --health-timeout 3s --health-retries 10
+    env:
+      DATABASE_URL: postgresql+psycopg://stockpilot:ci-only@localhost:5432/stockpilot
+    defaults: { run: { working-directory: session21-capstone/backend } }
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with: { python-version: "3.12", cache: pip, cache-dependency-path: session21-capstone/backend/requirements.txt }
+      - run: pip install -r requirements.txt
+      - name: upgrade -> downgrade -> upgrade (proves every migration is reversible)
+        run: |
+          alembic upgrade head && alembic current
+          alembic downgrade base
+          alembic upgrade head && alembic current
+
+  frontend-build:
+    name: Frontend build (React + Vite)
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: session21-capstone/frontend } }
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: session21-capstone/frontend/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - run: npm run build
+      - run: npm audit --omit=dev --audit-level=high
+
+  security:
+    name: Secret scan + SAST
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Gitleaks (no credentials committed)
+        run: |
+          docker run --rm -v "$PWD/$APP_DIR:/src" zricethezav/gitleaks:latest \
+            dir /src --no-banner --redact --config /src/security/.gitleaks.toml
+      - uses: actions/setup-python@v7
+        with: { python-version: "3.12" }
+      - name: Bandit (Python SAST)
+        run: pip install bandit && bandit -c "$APP_DIR/security/bandit.yaml" -r "$APP_DIR/backend/app" -ll
+
+  images:
+    name: Build + Trivy scan (${{ matrix.component }})
+    needs: [backend-tests, migrations, frontend-build, security]
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        component: [backend, frontend]
+    steps:
+      - uses: actions/checkout@v7
+      - name: Image name (tag = full commit SHA, never "latest")
+        id: meta
+        run: echo "image=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/stockpilot-${{ matrix.component }}:${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+      - name: docker build
+        run: docker build --build-arg APP_VERSION=${GITHUB_SHA::7} -t "${{ steps.meta.outputs.image }}" "$APP_DIR/${{ matrix.component }}"
+      - name: Trivy scan (fails on fixable HIGH/CRITICAL)
+        run: |
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$PWD/$APP_DIR/security:/cfg" \
+            aquasec/trivy:latest image --config /cfg/trivy.yaml "${{ steps.meta.outputs.image }}" | tee trivy.txt
+          rc=${PIPESTATUS[0]}
+          # publish the result table to the run summary - especially when the scan fails the build
+          { echo "### Trivy - ${{ matrix.component }} (exit code $rc)"; echo '```'; sed -n '/Report Summary/,$p' trivy.txt | head -60; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          exit $rc
+      - run: docker save "${{ steps.meta.outputs.image }}" -o image.tar
+      - uses: actions/upload-artifact@v7
+        with: { name: "image-${{ matrix.component }}", path: image.tar, retention-days: 1 }
+
+  push:
+    name: Push ${{ matrix.component }} to GHCR
+    needs: images
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        component: [backend, frontend]
+    steps:
+      - uses: actions/download-artifact@v8
+        with: { name: "image-${{ matrix.component }}" }
+      - run: docker load -i image.tar
+      - uses: docker/login-action@v4
+        with: { registry: ghcr.io, username: "${{ github.actor }}", password: "${{ secrets.GITHUB_TOKEN }}" }
+      - name: push the exact image that was scanned (no rebuild)
+        run: docker push "ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/stockpilot-${{ matrix.component }}:${GITHUB_SHA}"
+
+  deploy:
+    name: Deploy with Helm + smoke test
+    needs: push
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Kubernetes cluster (kind) - kubectl is configured by the action
+        uses: helm/kind-action@v1
+        with: { cluster_name: stockpilot }
+      - name: Load the pushed images into the cluster
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          for c in backend frontend; do
+            img="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/stockpilot-$c:${GITHUB_SHA}"
+            docker pull "$img" && kind load docker-image "$img" --name stockpilot
+          done
+      - name: helm upgrade --install
+        run: |
+          kubectl apply -f "$APP_DIR/k8s/namespace.yaml"
+          OWNER="${GITHUB_REPOSITORY_OWNER,,}"
+          helm upgrade --install stockpilot "$APP_DIR/helm/stockpilot" --namespace stockpilot \
+            --set backend.image.repository="ghcr.io/$OWNER/stockpilot-backend" --set backend.image.tag="$GITHUB_SHA" \
+            --set frontend.image.repository="ghcr.io/$OWNER/stockpilot-frontend" --set frontend.image.tag="$GITHUB_SHA" \
+            --set ingress.enabled=false --set monitoring.enabled=false \
+            --wait --timeout 5m
+          helm list -n stockpilot
+          kubectl get pods,svc,hpa -n stockpilot
+      - name: Smoke test through the frontend (nginx -> backend -> PostgreSQL)
+        run: |
+          kubectl port-forward -n stockpilot svc/stockpilot-frontend 8080:80 >/dev/null 2>&1 &
+          sleep 4
+          curl -fs localhost:8080/ | grep -o "<title>.*</title>"
+          curl -fs -X POST localhost:8080/api/products -H 'Content-Type: application/json' \
+            -d '{"sku":"CI-SMOKE-1","name":"Deployed by the pipeline","category":"CI","quantity":3,"unit_price":"1"}'
+          echo
+          curl -fs localhost:8080/api/stats

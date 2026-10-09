@@ -1,0 +1,13 @@
+# Secret scanning: default rules plus narrow, documented exceptions for demo-only values.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Documented local/demo credentials and non-secret hashes"
+regexTarget = "line"
+regexes = [
+  '''stockpilot-demo-password''',          # Helm demo value; prod uses postgres.existingSecret
+  '''stockpilot-dev''',                    # docker compose local default
+  '''change-me''',                         # .env.example placeholders
+  '''checksum/(config|secret): [0-9a-f]{64}''',
+]

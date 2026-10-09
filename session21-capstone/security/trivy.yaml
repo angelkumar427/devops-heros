@@ -1,0 +1,7 @@
+# Container image scanning (both images). The pipeline fails on HIGH or CRITICAL findings that
+# have a fix available. Note: ignore-unfixed must sit under "vulnerability:" - at the top level
+# Trivy silently ignores it (found the hard way in the session 21 final project).
+severity: [HIGH, CRITICAL]
+exit-code: 1
+vulnerability:
+  ignore-unfixed: true
