@@ -1,0 +1,19 @@
+# Production overrides
+backend:
+  env:
+    APP_ENV: prod
+  resources:
+    requests: { cpu: 250m, memory: 256Mi }
+    limits:   { cpu: "1", memory: 512Mi }
+  autoscaling:
+    minReplicas: 3
+    maxReplicas: 10
+frontend:
+  replicaCount: 3
+postgres:
+  enabled: false                       # managed database instead of an in-cluster StatefulSet
+  existingSecret: stockpilot-db        # created out-of-band, never committed
+externalDatabase:
+  host: stockpilot.xxxxxxxx.ap-south-1.rds.amazonaws.com
+ingress:
+  host: stockpilot.example.com

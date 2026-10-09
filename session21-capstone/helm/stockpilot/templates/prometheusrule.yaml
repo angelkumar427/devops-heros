@@ -1,0 +1,46 @@
+{{- if .Values.monitoring.enabled }}
+{{- $ns := .Release.Namespace }}
+{{- $job := printf "%s-backend" (include "sp.name" .) }}
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ include "sp.name" . }}
+  labels: {{- include "sp.labels" . | nindent 4 }}
+spec:
+  groups:
+    - name: stockpilot.availability
+      rules:
+        - alert: StockPilotBackendDown
+          expr: absent(up{job="{{ $job }}", namespace="{{ $ns }}"} == 1)
+          for: 1m
+          labels: { severity: critical }
+          annotations: { summary: "No healthy StockPilot backend pod is being scraped" }
+        - alert: StockPilotHighErrorRate
+          expr: |
+            (sum(rate(http_requests_total{job="{{ $job }}", namespace="{{ $ns }}", status="5xx"}[5m])) or vector(0))
+              / clamp_min(sum(rate(http_requests_total{job="{{ $job }}", namespace="{{ $ns }}"}[5m])), 1e-9) > 0.05
+          for: 2m
+          labels: { severity: warning }
+          annotations: { summary: "More than 5% of API requests are failing with 5xx" }
+        - alert: StockPilotSlowRequests
+          expr: |
+            histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket{job="{{ $job }}", namespace="{{ $ns }}"}[5m]))) > 0.5
+          for: 5m
+          labels: { severity: warning }
+          annotations: { summary: "API p95 latency above 500 ms" }
+        - alert: StockPilotAutoscalerAtMax
+          expr: |
+            kube_horizontalpodautoscaler_status_current_replicas{namespace="{{ $ns }}", horizontalpodautoscaler="{{ $job }}"}
+              >= kube_horizontalpodautoscaler_spec_max_replicas{namespace="{{ $ns }}", horizontalpodautoscaler="{{ $job }}"}
+          for: 10m
+          labels: { severity: warning }
+          annotations: { summary: "Backend HPA has been at its maximum for 10 minutes - raise maxReplicas or investigate load" }
+    - name: stockpilot.business
+      rules:
+        # every backend pod reports the same DB-derived value, hence max()
+        - alert: StockPilotProductsNeedReorder
+          expr: max(inventory_low_stock_products{namespace="{{ $ns }}"}) > 0
+          for: 10m
+          labels: { severity: info }
+          annotations: { summary: "{{ "{{" }} $value {{ "}}" }} product(s) are at or below their reorder level" }
+{{- end }}

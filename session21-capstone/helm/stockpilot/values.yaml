@@ -1,0 +1,62 @@
+# StockPilot - default values (local / classroom cluster)
+
+backend:
+  image:
+    repository: stockpilot-backend
+    tag: local
+    pullPolicy: IfNotPresent
+  replicaCount: 2
+  env:
+    APP_ENV: dev
+  resources:
+    requests: { cpu: 100m, memory: 128Mi }
+    limits:   { cpu: 500m, memory: 256Mi }
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 6
+    targetCPUUtilizationPercentage: 60
+
+frontend:
+  image:
+    repository: stockpilot-frontend
+    tag: local
+    pullPolicy: IfNotPresent
+  replicaCount: 2
+  resources:
+    requests: { cpu: 50m, memory: 32Mi }
+    limits:   { cpu: 200m, memory: 96Mi }
+
+postgres:
+  enabled: true                 # false = use externalDatabase (e.g. Amazon RDS)
+  image: postgres:18-alpine
+  database: stockpilot
+  username: stockpilot
+  # DEMO VALUE ONLY. Real deployments set existingSecret to a Secret managed outside Git
+  # (Sealed Secrets / External Secrets / AWS Secrets Manager) with key POSTGRES_PASSWORD.
+  password: stockpilot-demo-password
+  existingSecret: ""
+  storage:
+    size: 1Gi
+    storageClassName: ""        # "" = cluster default
+  resources:
+    requests: { cpu: 100m, memory: 128Mi }
+    limits:   { cpu: 500m, memory: 512Mi }
+
+externalDatabase:
+  host: ""
+  port: 5432
+
+imagePullSecrets: []
+
+ingress:
+  enabled: true
+  className: nginx
+  host: stockpilot.local
+  annotations: {}
+
+podDisruptionBudget:
+  enabled: true
+
+monitoring:
+  enabled: true                 # ServiceMonitor, PrometheusRule and Grafana dashboard

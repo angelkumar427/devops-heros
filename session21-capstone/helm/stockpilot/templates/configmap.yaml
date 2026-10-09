@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "sp.name" . }}-backend
+  labels: {{- include "sp.labels" . | nindent 4 }}
+data:
+  APP_ENV: {{ .Values.backend.env.APP_ENV | quote }}
+  POSTGRES_HOST: {{ include "sp.dbHost" . | quote }}
+  POSTGRES_PORT: {{ .Values.externalDatabase.port | default 5432 | quote }}
+  POSTGRES_DB: {{ .Values.postgres.database | quote }}
+  POSTGRES_USER: {{ .Values.postgres.username | quote }}

@@ -1,0 +1,71 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "sp.name" . }}-backend
+  labels:
+    {{- include "sp.labels" . | nindent 4 }}
+    {{- include "sp.selector" (dict "ctx" . "component" "backend") | nindent 4 }}
+spec:
+  {{- if not .Values.backend.autoscaling.enabled }}
+  replicas: {{ .Values.backend.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels: {{- include "sp.selector" (dict "ctx" . "component" "backend") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "sp.selector" (dict "ctx" . "component" "backend") | nindent 8 }}
+        app.kubernetes.io/version: {{ .Values.backend.image.tag | trunc 12 | quote }}
+      annotations:
+        # env vars are read once at start-up: roll the pods whenever config or credentials change
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- include "sp.podSecurity" . | nindent 8 }}
+        runAsUser: 10001
+      containers:
+        - name: backend
+          image: "{{ .Values.backend.image.repository }}:{{ .Values.backend.image.tag }}"
+          imagePullPolicy: {{ .Values.backend.image.pullPolicy }}
+          ports:
+            - { name: http, containerPort: 8000 }
+          envFrom:
+            - configMapRef: { name: {{ include "sp.name" . }}-backend }
+          env:
+            - { name: APP_VERSION, value: {{ .Values.backend.image.tag | trunc 12 | quote }} }
+            - name: POSTGRES_PASSWORD
+              valueFrom: { secretKeyRef: { name: {{ include "sp.secretName" . }}, key: POSTGRES_PASSWORD } }
+          # start-up waits for the DB and runs migrations: give it time before liveness kicks in
+          startupProbe:
+            httpGet: { path: /health, port: http }
+            periodSeconds: 3
+            failureThreshold: 40
+          livenessProbe:
+            httpGet: { path: /health, port: http }
+            periodSeconds: 10
+          readinessProbe:
+            httpGet: { path: /ready, port: http }
+            periodSeconds: 5
+          securityContext: {{- include "sp.containerSecurity" . | nindent 12 }}
+          resources: {{- toYaml .Values.backend.resources | nindent 12 }}
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - { name: tmp, emptyDir: {} }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "sp.name" . }}-backend
+  labels:
+    {{- include "sp.labels" . | nindent 4 }}
+    {{- include "sp.selector" (dict "ctx" . "component" "backend") | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector: {{- include "sp.selector" (dict "ctx" . "component" "backend") | nindent 4 }}
+  ports:
+    - { name: http, port: 8000, targetPort: http }

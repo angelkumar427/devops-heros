@@ -1,0 +1,59 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "sp.name" . }}-frontend
+  labels:
+    {{- include "sp.labels" . | nindent 4 }}
+    {{- include "sp.selector" (dict "ctx" . "component" "frontend") | nindent 4 }}
+spec:
+  replicas: {{ .Values.frontend.replicaCount }}
+  selector:
+    matchLabels: {{- include "sp.selector" (dict "ctx" . "component" "frontend") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "sp.selector" (dict "ctx" . "component" "frontend") | nindent 8 }}
+        app.kubernetes.io/version: {{ .Values.frontend.image.tag | trunc 12 | quote }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- include "sp.podSecurity" . | nindent 8 }}
+        runAsUser: 101
+      containers:
+        - name: frontend
+          image: "{{ .Values.frontend.image.repository }}:{{ .Values.frontend.image.tag }}"
+          imagePullPolicy: {{ .Values.frontend.image.pullPolicy }}
+          ports:
+            - { name: http, containerPort: 8080 }
+          env:
+            - { name: BACKEND_URL, value: "http://{{ include "sp.name" . }}-backend:8000" }
+          livenessProbe:
+            httpGet: { path: /healthz, port: http }
+            periodSeconds: 10
+          readinessProbe:
+            httpGet: { path: /healthz, port: http }
+            periodSeconds: 5
+          securityContext: {{- include "sp.containerSecurity" . | nindent 12 }}
+          resources: {{- toYaml .Values.frontend.resources | nindent 12 }}
+          volumeMounts:
+            # read-only root FS: nginx renders its config and writes pid/temp files here
+            - { name: conf, mountPath: /etc/nginx/conf.d }
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - { name: conf, emptyDir: {} }
+        - { name: tmp, emptyDir: {} }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "sp.name" . }}-frontend
+  labels:
+    {{- include "sp.labels" . | nindent 4 }}
+    {{- include "sp.selector" (dict "ctx" . "component" "frontend") | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector: {{- include "sp.selector" (dict "ctx" . "component" "frontend") | nindent 4 }}
+  ports:
+    - { name: http, port: 80, targetPort: http }

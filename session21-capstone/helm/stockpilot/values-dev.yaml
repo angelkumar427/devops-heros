@@ -1,0 +1,8 @@
+# Local development: one replica each, no autoscaling
+backend:
+  replicaCount: 1
+  autoscaling: { enabled: false }
+frontend:
+  replicaCount: 1
+podDisruptionBudget:
+  enabled: false

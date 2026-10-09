@@ -1,0 +1,73 @@
+{{- if .Values.postgres.enabled }}
+# In-cluster PostgreSQL for the classroom/local cluster. Production points externalDatabase at a
+# managed service (Amazon RDS) instead - backups, failover and patching are then AWS's job.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "sp.name" . }}-postgres
+  labels: {{- include "sp.labels" . | nindent 4 }}
+spec:
+  clusterIP: None              # headless: stable DNS for the StatefulSet pod
+  selector: {{- include "sp.selector" (dict "ctx" . "component" "postgres") | nindent 4 }}
+  ports:
+    - { name: postgres, port: 5432, targetPort: postgres }
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "sp.name" . }}-postgres
+  labels: {{- include "sp.labels" . | nindent 4 }}
+spec:
+  serviceName: {{ include "sp.name" . }}-postgres
+  replicas: 1
+  selector:
+    matchLabels: {{- include "sp.selector" (dict "ctx" . "component" "postgres") | nindent 6 }}
+  template:
+    metadata:
+      labels: {{- include "sp.selector" (dict "ctx" . "component" "postgres") | nindent 8 }}
+      annotations:
+        checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
+    spec:
+      securityContext:
+        {{- include "sp.podSecurity" . | nindent 8 }}
+        runAsUser: 70            # the "postgres" user in the alpine image
+        runAsGroup: 70
+        fsGroup: 70
+      containers:
+        - name: postgres
+          image: {{ .Values.postgres.image }}
+          ports:
+            - { name: postgres, containerPort: 5432 }
+          env:
+            - { name: POSTGRES_DB, value: {{ .Values.postgres.database | quote }} }
+            - { name: POSTGRES_USER, value: {{ .Values.postgres.username | quote }} }
+            - name: POSTGRES_PASSWORD
+              valueFrom: { secretKeyRef: { name: {{ include "sp.secretName" . }}, key: POSTGRES_PASSWORD } }
+          readinessProbe:
+            exec: { command: ["sh", "-c", "pg_isready -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\""] }
+            periodSeconds: 5
+          livenessProbe:
+            exec: { command: ["sh", "-c", "pg_isready -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\""] }
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: ["ALL"] }
+          resources: {{- toYaml .Values.postgres.resources | nindent 12 }}
+          volumeMounts:
+            - { name: data, mountPath: /var/lib/postgresql }   # Postgres 18: PGDATA lives under here
+            - { name: run, mountPath: /var/run/postgresql }
+      volumes:
+        - { name: run, emptyDir: {} }
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: [ReadWriteOnce]
+        {{- if .Values.postgres.storage.storageClassName }}
+        storageClassName: {{ .Values.postgres.storage.storageClassName }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.postgres.storage.size }}
+{{- end }}

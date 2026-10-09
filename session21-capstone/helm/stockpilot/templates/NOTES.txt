@@ -1,0 +1,7 @@
+StockPilot {{ .Values.backend.image.tag }} deployed as release "{{ .Release.Name }}" in "{{ .Release.Namespace }}".
+{{- if .Values.ingress.enabled }}
+  App:      http://{{ .Values.ingress.host }}/
+  API docs: http://{{ .Values.ingress.host }}/docs
+{{- end }}
+  Pods:     kubectl get pods -n {{ .Release.Namespace }} -l app.kubernetes.io/instance={{ .Release.Name }}
+  HPA:      kubectl get hpa -n {{ .Release.Namespace }}

@@ -1,0 +1,29 @@
+{{- if .Values.ingress.enabled }}
+# One hostname, two backends: the browser only ever talks to stockpilot.local.
+#   /api, /docs, /openapi.json  -> FastAPI backend
+#   /                           -> React frontend (nginx)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "sp.name" . }}
+  labels: {{- include "sp.labels" . | nindent 4 }}
+  {{- with .Values.ingress.annotations }}
+  annotations: {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  rules:
+    - host: {{ .Values.ingress.host }}
+      http:
+        paths:
+          {{- range list "/api" "/docs" "/openapi.json" }}
+          - path: {{ . }}
+            pathType: Prefix
+            backend:
+              service: { name: {{ include "sp.name" $ }}-backend, port: { name: http } }
+          {{- end }}
+          - path: /
+            pathType: Prefix
+            backend:
+              service: { name: {{ include "sp.name" . }}-frontend, port: { name: http } }
+{{- end }}
