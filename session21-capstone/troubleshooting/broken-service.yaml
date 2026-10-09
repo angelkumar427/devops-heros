@@ -1,0 +1,35 @@
+# Lab 2 - every pod is Running and Ready, yet nothing answers through the Service.
+#   kubectl apply -f troubleshooting/broken-service.yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: stockpilot-lab
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: catalog-web
+  namespace: stockpilot-lab
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: catalog-web }
+  template:
+    metadata:
+      labels: { app: catalog-web, tier: frontend }
+    spec:
+      containers:
+        - name: web
+          image: nginxinc/nginx-unprivileged:1.31-alpine
+          ports: [{ name: http, containerPort: 8080 }]
+          readinessProbe: { httpGet: { path: /, port: http } }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: catalog-web
+  namespace: stockpilot-lab
+spec:
+  selector: { app: catalog-wbe, tier: frontend }
+  ports:
+    - { name: http, port: 80, targetPort: http }
