@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+coverage.xml
+test-results.xml
+.venv/
+venv/
+# Node / frontend build
+node_modules/
+dist/
+.vite/
+# Local secrets and environment
+.env
+.env.*
+!.env.example
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+tfplan
+# OS
+.DS_Store
