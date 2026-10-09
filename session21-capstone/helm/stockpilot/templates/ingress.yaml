@@ -16,9 +16,10 @@ spec:
     - host: {{ .Values.ingress.host }}
       http:
         paths:
-          {{- range list "/api" "/docs" "/openapi.json" }}
-          - path: {{ . }}
-            pathType: Prefix
+          # ingress-nginx validates Prefix/Exact paths strictly (no dots), so the file path is ImplementationSpecific
+          {{- range $path, $type := dict "/api" "Prefix" "/docs" "Prefix" "/openapi.json" "ImplementationSpecific" }}
+          - path: {{ $path }}
+            pathType: {{ $type }}
             backend:
               service: { name: {{ include "sp.name" $ }}-backend, port: { name: http } }
           {{- end }}

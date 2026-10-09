@@ -8,9 +8,11 @@ backend:
   replicaCount: 2
   env:
     APP_ENV: dev
+  # Start-up (3 Python processes: wait-for-db, alembic, uvicorn) is CPU-heavy; a 1-core limit lets
+  # it burst. The request stays small - it is what scheduling and the HPA percentage are based on.
   resources:
     requests: { cpu: 100m, memory: 128Mi }
-    limits:   { cpu: 500m, memory: 256Mi }
+    limits:   { cpu: "1", memory: 256Mi }
   autoscaling:
     enabled: true
     minReplicas: 2
