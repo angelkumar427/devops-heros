@@ -65,3 +65,14 @@ variable "api_allowed_cidrs" {
   type        = list(string)
   default     = ["0.0.0.0/0"]
 }
+
+variable "enable_nat_gateway" {
+  description = <<-EOT
+    true  = worker nodes in the private subnets, outbound via a NAT gateway (production layout).
+    false = no NAT gateway: worker nodes run in the public subnets with auto-assigned public IPs.
+            Use when the account has no Elastic IP left (default quota: 5 per region) or to save
+            the NAT gateway's hourly cost. Node security groups still admit only cluster traffic.
+  EOT
+  type        = bool
+  default     = true
+}

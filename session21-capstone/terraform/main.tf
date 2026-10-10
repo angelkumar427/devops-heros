@@ -51,14 +51,16 @@ resource "aws_subnet" "private" {
 }
 
 # One NAT gateway keeps the classroom bill low. Production uses one per AZ, so losing an AZ
-# does not cut every node off from the internet.
+# does not cut every node off from the internet. Optional: see var.enable_nat_gateway.
 resource "aws_eip" "nat" {
+  count  = var.enable_nat_gateway ? 1 : 0
   domain = "vpc"
   tags   = { Name = "${var.cluster_name}-nat-eip" }
 }
 
 resource "aws_nat_gateway" "this" {
-  allocation_id = aws_eip.nat.id
+  count         = var.enable_nat_gateway ? 1 : 0
+  allocation_id = aws_eip.nat[0].id
   subnet_id     = aws_subnet.public[0].id
   tags          = { Name = "${var.cluster_name}-nat" }
   depends_on    = [aws_internet_gateway.this]
@@ -75,9 +77,12 @@ resource "aws_route_table" "public" {
 
 resource "aws_route_table" "private" {
   vpc_id = aws_vpc.this.id
-  route {
-    cidr_block     = "0.0.0.0/0"
-    nat_gateway_id = aws_nat_gateway.this.id
+  dynamic "route" {
+    for_each = var.enable_nat_gateway ? [1] : []
+    content {
+      cidr_block     = "0.0.0.0/0"
+      nat_gateway_id = aws_nat_gateway.this[0].id
+    }
   }
   tags = { Name = "${var.cluster_name}-private" }
 }
@@ -166,9 +171,10 @@ resource "aws_eks_node_group" "default" {
   cluster_name    = aws_eks_cluster.this.name
   node_group_name = "${var.cluster_name}-default"
   node_role_arn   = aws_iam_role.node.arn
-  subnet_ids      = aws_subnet.private[*].id
-  instance_types  = var.node_instance_types
-  capacity_type   = "ON_DEMAND"
+  # Private subnets when there is a NAT gateway to reach the internet through; otherwise public.
+  subnet_ids     = var.enable_nat_gateway ? aws_subnet.private[*].id : aws_subnet.public[*].id
+  instance_types = var.node_instance_types
+  capacity_type  = "ON_DEMAND"
 
   scaling_config {
     desired_size = var.node_desired_size
@@ -180,6 +186,6 @@ resource "aws_eks_node_group" "default" {
     max_unavailable = 1
   }
 
-  # Nodes need their IAM policies AND a route to the internet (NAT) before they can join.
-  depends_on = [aws_iam_role_policy_attachment.node, aws_route_table_association.private]
+  # Nodes need their IAM policies AND a route to the internet before they can join the cluster.
+  depends_on = [aws_iam_role_policy_attachment.node, aws_route_table_association.private, aws_route_table_association.public]
 }

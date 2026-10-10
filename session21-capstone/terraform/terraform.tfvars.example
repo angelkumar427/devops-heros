@@ -9,3 +9,6 @@ api_allowed_cidrs = ["0.0.0.0/0"]
 
 node_instance_types = ["t3.medium"]
 node_desired_size   = 2
+
+# false = no NAT gateway / Elastic IP; nodes run in the public subnets (see variables.tf)
+enable_nat_gateway = true
