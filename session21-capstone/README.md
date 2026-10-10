@@ -336,7 +336,7 @@ Other layers: **Gitleaks** (secrets; the allowlist covers only documented demo v
 | VPC | `10.42.0.0/16`, DNS hostnames on (required for EKS nodes) |
 | Public subnets ×2 | 2 AZs, tagged `kubernetes.io/role/elb` for internet-facing load balancers |
 | Private subnets ×2 | worker nodes; no public IPs; outbound through NAT; tagged `internal-elb` |
-| Internet gateway, NAT gateway + Elastic IP, 2 route tables | public → IGW, private → NAT |
+| Internet gateway, NAT gateway + Elastic IP, 2 route tables | public → IGW, private → NAT (`enable_nat_gateway`; see below) |
 | IAM roles | cluster role (`AmazonEKSClusterPolicy`); node role (worker, CNI, ECR read-only) |
 | **EKS cluster** | access entries (`authentication_mode = "API"`), creator gets admin; public endpoint restricted by `api_allowed_cidrs` |
 | **Managed node group** | `t3.medium` × 2 (min 1, max 3) in the **private** subnets |
@@ -356,8 +356,46 @@ terraform destroy                                                    # always, a
   is committed.
 - **Cost-conscious:** one NAT gateway instead of one per AZ (documented trade-off), and small
   nodes. The whole stack was destroyed straight after the evidence was taken.
+- **`enable_nat_gateway`** (default `true`): with `false`, Terraform creates no NAT gateway or
+  Elastic IP and runs the nodes in the public subnets instead. That's for accounts that have used
+  up their Elastic IP quota ([§15](#15-engineering-findings)). The run below used the default, so
+  the nodes sit in **private** subnets.
 
-<!-- AWS-EVIDENCE -->
+### The real run: AWS, `ap-south-1`
+
+**`terraform plan`:** 22 resources, nothing changed or destroyed.
+
+![terraform plan](./screenshots/m7-13-terraform-plan.png)
+
+**`terraform apply` and outputs:** done in about 11½ minutes. The EKS control plane took 9m 9s,
+the NAT gateway 1m 56s and the node group 2m 0s.
+
+![terraform apply](./screenshots/m7-14-terraform-apply-outputs.png)
+
+**AWS Console.** The account name, account ID, user and the account number inside ARNs are
+hidden. Everything else is as captured.
+
+| VPC list | VPC resource map: 4 subnets in 2 AZs, route tables |
+|---|---|
+| ![vpc list](./screenshots/m7-15-aws-console-vpc-list.png) | ![vpc subnets](./screenshots/m7-16-aws-console-vpc-subnets.png) |
+
+![EKS cluster in the console](./screenshots/m7-17-aws-console-eks-cluster.png)
+
+*The console's "Pods/Nodes: Data unavailable" is expected. Only the IAM user that ran Terraform
+was granted Kubernetes admin (`bootstrap_cluster_creator_admin_permissions`), not the console
+role. The next screenshot shows the nodes through `kubectl` as that admin.*
+
+**The cluster from the API and `kubectl`:**
+- The cluster and node group are `ACTIVE`; the API endpoint is restricted to one `/32`.
+- Both `t3.medium` nodes are `Ready` in two AZs, with private addresses `10.42.10.x` and `10.42.11.x`.
+- The EKS add-ons (VPC CNI, CoreDNS, kube-proxy) are running.
+
+![eks kubectl](./screenshots/m7-18-eks-kubectl-nodes.png)
+
+**`terraform destroy`:** all 22 resources removed, then confirmed through the AWS API one by one
+(cluster, node group, instances, VPC, subnets, NAT gateway, Elastic IP, IAM roles).
+
+![terraform destroy](./screenshots/m7-19-terraform-destroy.png)
 
 ---
 
@@ -486,6 +524,11 @@ Real problems found by running the system, not just writing it:
    in the HPA test.
 8. **Stock changes lock the row** (`SELECT … FOR UPDATE`), so two replicas adjusting the same
    product can't lose an update.
+9. **Read the account's limits before `apply`.** A first attempt in a shared AWS account found
+   **5 of 5 Elastic IPs already in use**, which would have stopped `apply` at the NAT gateway. The
+   pre-flight check caught it, and the NAT gateway became the `enable_nat_gateway` variable instead
+   of a hard requirement. That run was destroyed; the evidence above comes from a clean run in an
+   account with room for the full private-subnet layout.
 
 ---
 
